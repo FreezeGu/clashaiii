@@ -9,6 +9,9 @@ import {
   getUpgradeCost,
 } from "./cards";
 
+const DAILY_GOLD_MS = 24 * 60 * 60 * 1000;
+const DAILY_GOLD_AMOUNT = 100;
+
 export interface GameState {
   playerName: string;
   trophies: number;
@@ -18,6 +21,7 @@ export interface GameState {
   cardAiLevels: Record<string, number>;
   dailyDealCardId: string;
   dailyDealDate: string;
+  lastDailyGoldClaimAt: number; // timestamp, 0 = never
 
   // Actions
   setPlayerName: (name: string) => void;
@@ -29,6 +33,7 @@ export interface GameState {
   purchaseGoldPack: (amount: number) => void;
   purchaseCardCrate: () => string | null;
   refreshDailyDeal: () => void;
+  claimDailyGold: () => boolean;
 }
 
 function getTodayString() {
@@ -54,6 +59,7 @@ export const useGameStore = create<GameState>()(
       ),
       dailyDealCardId: COLLECTION_CARDS[0].id,
       dailyDealDate: getTodayString(),
+      lastDailyGoldClaimAt: 0,
 
       setPlayerName: (name) => set({ playerName: name }),
 
@@ -66,7 +72,10 @@ export const useGameStore = create<GameState>()(
       unlockCard: (cardId) =>
         set((s) => {
           if (s.ownedCardIds.includes(cardId)) return s;
-          return { ownedCardIds: [...s.ownedCardIds, cardId] };
+          return {
+            ownedCardIds: [...s.ownedCardIds, cardId],
+            cardAiLevels: { ...s.cardAiLevels, [cardId]: 1 },
+          };
         }),
 
       swapDeckCard: (deckIndex, newCardId) =>
@@ -126,6 +135,22 @@ export const useGameStore = create<GameState>()(
             dailyDealDate: today,
           });
         }
+      },
+
+      claimDailyGold: () => {
+        const state = get();
+        const now = Date.now();
+        if (
+          state.lastDailyGoldClaimAt > 0 &&
+          now - state.lastDailyGoldClaimAt < DAILY_GOLD_MS
+        ) {
+          return false;
+        }
+        set({
+          gold: state.gold + DAILY_GOLD_AMOUNT,
+          lastDailyGoldClaimAt: now,
+        });
+        return true;
       },
     }),
     {

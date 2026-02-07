@@ -113,6 +113,8 @@ export interface Unit {
   splashRadius: number;
   hasProjectile: boolean;
   alive: boolean;
+  /** When > now, unit is frozen (cannot attack or move). Frost Mage applies this. */
+  frozenUntil: number;
 }
 
 export interface Projectile {
@@ -125,6 +127,8 @@ export interface Projectile {
   splashRadius: number;
   targetTeam: Team;
   sourceId: string;
+  /** Card id of the unit that fired (e.g. "maga" for Frost Mage freeze). Used when source unit may be dead. */
+  sourceCardId?: string;
   alive: boolean;
 }
 
@@ -543,6 +547,7 @@ export function spawnUnit(
       splashRadius: cardDef.splashRadius || 0,
       hasProjectile: !!cardDef.projectile,
       alive: true,
+      frozenUntil: 0,
     });
   }
 
@@ -681,6 +686,7 @@ export function updateBattle(state: BattleState, dt: number): void {
   if (state.gameOver) return;
 
   const now = Date.now();
+  const FREEZE_DURATION_MS = 1000;
 
   // Update timer
   state.timeRemaining = Math.max(
@@ -710,6 +716,7 @@ export function updateBattle(state: BattleState, dt: number): void {
   // Update units
   for (const unit of state.units) {
     if (!unit.alive) continue;
+    if (unit.frozenUntil > now) continue;
 
     const aiParams = getAIBehaviorParams(unit.aiLevel);
 
@@ -745,7 +752,6 @@ export function updateBattle(state: BattleState, dt: number): void {
         unit.lastAttackTime = now;
 
         if (unit.hasProjectile) {
-          // Fire projectile
           state.projectiles.push({
             id: `p_${state.nextProjectileId++}`,
             from: { ...unit.pos },
@@ -756,6 +762,7 @@ export function updateBattle(state: BattleState, dt: number): void {
             splashRadius: unit.splashRadius,
             targetTeam: unit.team === "player" ? "bot" : "player",
             sourceId: unit.id,
+            sourceCardId: unit.cardDef.id,
             alive: true,
           });
         } else {
@@ -841,16 +848,16 @@ export function updateBattle(state: BattleState, dt: number): void {
     if (d < 0.5) {
       // Hit
       proj.alive = false;
-      // Apply damage to nearby enemies
+      const damagedUnits: Unit[] = [];
       if (proj.splashRadius > 0) {
         for (const unit of state.units) {
           if (unit.team !== proj.targetTeam || !unit.alive) continue;
           if (dist(unit.pos, proj.to) <= proj.splashRadius) {
             dealDamageToUnit(state, unit, proj.damage);
+            damagedUnits.push(unit);
           }
         }
       } else {
-        // Find nearest enemy at impact
         let nearest: Unit | null = null;
         let nearestD = 2;
         for (const unit of state.units) {
@@ -863,6 +870,14 @@ export function updateBattle(state: BattleState, dt: number): void {
         }
         if (nearest) {
           dealDamageToUnit(state, nearest, proj.damage);
+          damagedUnits.push(nearest);
+        }
+      }
+      const isFrostMageProj = proj.sourceCardId === "maga";
+      if (isFrostMageProj) {
+        for (const u of damagedUnits) {
+          u.frozenUntil = now + FREEZE_DURATION_MS;
+          u.lastAttackTime = now;
         }
       }
     } else {

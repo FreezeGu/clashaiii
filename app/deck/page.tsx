@@ -9,6 +9,7 @@ import { COLLECTION_CARDS, getUpgradeCost } from "@/lib/game/cards";
 import type { CardDef } from "@/lib/game/cards";
 import { ArrowRightLeft, Zap, X, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MiniBattlePreview } from "@/components/game/mini-battle-preview";
 
 export default function DeckPage({
   params,
@@ -21,6 +22,7 @@ export default function DeckPage({
   if (searchParams) React.use(searchParams);
 
   const {
+    playerName,
     deckIds,
     ownedCardIds,
     cardAiLevels,
@@ -74,85 +76,118 @@ export default function DeckPage({
 
       <main className="flex-1 px-4 pt-4 pb-24 overflow-y-auto">
         {/* Page title */}
-        <div className="mb-4">
+        <div className="mb-3">
           <h1 className="text-xl font-bold text-foreground">Deck</h1>
           <p className="text-xs text-muted-foreground">
-            Your battle deck - 6 cards
+            Manage your deck and collection
           </p>
         </div>
 
-        {/* Deck slots */}
-        <div className="grid grid-cols-6 gap-2 mb-6">
-          {deckCards.map((card, i) => (
-            <div key={`${card.id}-${i}`} className="relative">
-              <CardThumbnail
-                card={card}
-                aiLevel={cardAiLevels[card.id] || 1}
-                size="sm"
-                selected={swapMode && selectedCard !== null}
-                onClick={() => {
-                  if (swapMode && selectedCard) {
-                    handleSwap(i);
-                  }
-                }}
-              />
-              {swapMode && selectedCard && (
-                <div className="absolute inset-0 bg-primary/10 rounded-lg border-2 border-dashed border-primary flex items-center justify-center">
-                  <ArrowRightLeft className="h-4 w-4 text-primary" />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Collection */}
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-foreground mb-1">
-            Collezione
+        {/* Your deck + Collection in one card */}
+        <div className="bg-charcoal-light border border-border rounded-xl p-4 mb-4">
+          {/* Your deck */}
+          <h2 className="text-sm font-semibold text-primary mb-1">
+            Your deck
           </h2>
-          <p className="text-[10px] text-muted-foreground mb-3">
-            Tap a card to manage it
+          <p className="text-[10px] text-muted-foreground mb-2">
+            6 cards used in battle
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="mx-auto max-w-[min(100%,26rem)] grid grid-cols-6 gap-2 mb-5">
+            {deckCards.map((card, i) => (
+              <div
+                key={`${card.id}-${i}`}
+                className="relative flex justify-center overflow-visible transition-transform duration-200 ease-out hover:scale-105 hover:z-10"
+              >
+                <CardThumbnail
+                  card={card}
+                  aiLevel={cardAiLevels[card.id] ?? 1}
+                  size="sm"
+                  selected={swapMode && selectedCard !== null}
+                  onClick={() => {
+                    if (swapMode && selectedCard) {
+                      handleSwap(i);
+                    }
+                  }}
+                />
+                {swapMode && selectedCard && (
+                  <div className="absolute inset-0 bg-primary/10 rounded-lg border-2 border-dashed border-primary flex items-center justify-center pointer-events-none">
+                    <ArrowRightLeft className="h-4 w-4 text-primary" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Collection - right below deck */}
+          <h2 className="text-sm font-semibold text-primary mb-1">
+            Collection
+          </h2>
+          <p className="text-[10px] text-muted-foreground mb-2">
+            Tap a card to swap into deck or upgrade (all start at level 1)
+          </p>
+          <div className="mx-auto max-w-[min(100%,22rem)] grid grid-cols-4 gap-2">
             {ownedCards.map((card) => (
-              <CardThumbnail
+              <div
                 key={card.id}
-                card={card}
-                aiLevel={cardAiLevels[card.id] || 1}
-                size="sm"
-                selected={selectedCard?.id === card.id}
-                onClick={() => {
-                  setSelectedCard(
-                    selectedCard?.id === card.id ? null : card
-                  );
-                  setSwapMode(false);
-                }}
-              />
+                className="relative flex justify-center overflow-visible transition-transform duration-200 ease-out hover:scale-105 hover:z-10"
+              >
+                <CardThumbnail
+                  card={card}
+                  aiLevel={cardAiLevels[card.id] ?? 1}
+                  size="sm"
+                  selected={selectedCard?.id === card.id}
+                  onClick={() => {
+                    setSelectedCard(
+                      selectedCard?.id === card.id ? null : card
+                    );
+                    setSwapMode(false);
+                  }}
+                />
+              </div>
             ))}
           </div>
         </div>
       </main>
 
-      {/* Card detail modal */}
+      {/* Card detail modal - centered */}
       {selectedCard && !swapMode && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-charcoal/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-charcoal-light border-t border-border rounded-t-2xl p-5 safe-bottom animate-in slide-in-from-bottom duration-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/60 backdrop-blur-sm"
+          onClick={() => setSelectedCard(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-md bg-charcoal-light border border-border rounded-2xl p-5 shadow-xl animate-in zoom-in-95 fade-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-lg font-bold text-foreground">
                   {selectedCard.name}
                 </h3>
-                <p className="text-xs text-muted-foreground italic">
-                  {selectedCard.name}
+                <p className="text-xs text-muted-foreground">
+                  Level {cardAiLevels[selectedCard.id] ?? 1} · Tap to swap or upgrade
                 </p>
               </div>
               <button
                 onClick={() => setSelectedCard(null)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary/50"
                 type="button"
               >
                 <X className="h-5 w-5" />
               </button>
+            </div>
+
+            {/* Mini battle preview - unit spawning and attacking king tower with enemies */}
+            <div className="mb-4 rounded-xl bg-background/80 border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">
+                In battle
+              </p>
+              <MiniBattlePreview card={selectedCard} playerName={playerName} />
+              <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                You ({playerName}) as this fighter vs Rival’s two archers. Your unit (green) fights the archers (red) and the king tower.
+              </p>
             </div>
 
             <p className="text-sm text-muted-foreground mb-3">

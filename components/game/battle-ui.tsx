@@ -167,24 +167,6 @@ export function BattleBottomHUD({
                     : "bg-muted text-muted-foreground"
                 )}
               >
-                {card.cardDef.cost}
-              </div>
-              <div className="flex-1 flex items-center justify-center min-h-0">
-                <Icon
-                  className="h-5 w-5 shrink-0"
-                  style={{ color: card.cardDef.color }}
-                />
-              </div>
-              <span className="text-[8px] font-semibold text-foreground text-center leading-tight truncate w-full">
-                {card.cardDef.name}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </footer>
-  );
-}
 
 interface BattleUIProps {
   hand: HandCard[];
