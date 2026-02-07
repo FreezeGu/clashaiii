@@ -495,6 +495,24 @@ export function BattleCanvas({
                 : "#ef4444";
           ctx.fillRect(barX, barY, barW * hpRatio, barH);
         }
+
+        if (unit.frozenUntil > now) {
+          const r = radius * 1.4;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.fillStyle = "rgba(100, 200, 255, 0.25)";
+          ctx.strokeStyle = "rgba(80, 180, 255, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, -r);
+          ctx.lineTo(r * 0.7, r * 0.5);
+          ctx.lineTo(0, r * 0.3);
+          ctx.lineTo(-r * 0.7, r * 0.5);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
 

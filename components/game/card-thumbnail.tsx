@@ -8,6 +8,8 @@ import type { LucideIcon } from "lucide-react";
 
 const LANCEGUARD_IDLE_FRAMES = 7;
 const LANCEGUARD_IDLE_FPS = 8;
+const FROST_MAGE_IDLE_FRAMES = 8;
+const FROST_MAGE_IDLE_FPS = 8;
 
 const ICON_MAP: Record<string, LucideIcon> = {
   sword: Sword,
@@ -42,15 +44,24 @@ export function CardThumbnail({
   const [idleFrame, setIdleFrame] = useState(0);
   const Icon = ICON_MAP[card.icon] || Sword;
   const isLanceguard = card.id === "lancia";
+  const isFrostMage = card.id === "maga";
 
   useEffect(() => {
-    if (!isLanceguard) return;
-    const interval = 1000 / LANCEGUARD_IDLE_FPS;
-    const id = setInterval(() => {
-      setIdleFrame((f) => (f + 1) % LANCEGUARD_IDLE_FRAMES);
-    }, interval);
-    return () => clearInterval(id);
-  }, [isLanceguard]);
+    if (isLanceguard) {
+      const interval = 1000 / LANCEGUARD_IDLE_FPS;
+      const id = setInterval(() => {
+        setIdleFrame((f) => (f + 1) % LANCEGUARD_IDLE_FRAMES);
+      }, interval);
+      return () => clearInterval(id);
+    }
+    if (isFrostMage) {
+      const interval = 1000 / FROST_MAGE_IDLE_FPS;
+      const id = setInterval(() => {
+        setIdleFrame((f) => (f + 1) % FROST_MAGE_IDLE_FRAMES);
+      }, interval);
+      return () => clearInterval(id);
+    }
+  }, [isLanceguard, isFrostMage]);
 
   const sizeClasses = {
     sm: "w-16 h-20",
@@ -87,12 +98,18 @@ export function CardThumbnail({
         </span>
       </div>
 
-      {/* Card icon / Lanceguard idle animation */}
+      {/* Card icon / unit idle animation (Lanceguard, Frost Mage) */}
       <div className="flex-1 flex items-center justify-center rounded min-h-0 overflow-hidden">
         {isLanceguard ? (
           <img
             src={`/units/lanceguard/idle/${idleFrame + 1}.png`}
             alt="Lanceguard"
+            className={cn("object-contain", size === "sm" ? "h-10 w-10" : "h-12 w-12")}
+          />
+        ) : isFrostMage ? (
+          <img
+            src={`/units/frostmage/idle/${idleFrame + 1}.png`}
+            alt="Frost Mage"
             className={cn("object-contain", size === "sm" ? "h-10 w-10" : "h-12 w-12")}
           />
         ) : (

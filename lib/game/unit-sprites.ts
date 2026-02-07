@@ -33,6 +33,16 @@ export const UNIT_SPRITE_CONFIG: Record<string, UnitSpriteConfig> = {
     attackDurationMs: 400,
     idleFps: 8,
   },
+  maga: {
+    folder: "frostmage",
+    walkFrames: 7,
+    attackFrames: 5,
+    idleFrames: 8,
+    scale: 1.5,
+    walkFps: 10,
+    attackDurationMs: 400,
+    idleFps: 8,
+  },
 };
 
 function getSpriteFolder(cardId: string): string | null {

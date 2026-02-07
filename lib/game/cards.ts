@@ -114,9 +114,10 @@ export const ALL_CARDS: CardDef[] = [
     unitType: "ranged",
     count: 1,
     projectile: true,
+    splashRadius: 1.8,
     color: "#9B59B6",
     icon: "crystal",
-    description: "A sorcerer who hurls icy bolts at foes.",
+    description: "A sorcerer who hurls icy bolts that freeze and splash onto two foes.",
   },
   {
     id: "colosso",

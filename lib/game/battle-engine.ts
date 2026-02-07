@@ -66,6 +66,8 @@ export interface Unit {
   splashRadius: number;
   hasProjectile: boolean;
   alive: boolean;
+  /** When > now, unit is frozen (cannot attack or move). Frost Mage applies this. */
+  frozenUntil: number;
 }
 
 export interface Projectile {
@@ -443,6 +445,7 @@ export function spawnUnit(
       splashRadius: cardDef.splashRadius || 0,
       hasProjectile: !!cardDef.projectile,
       alive: true,
+      frozenUntil: 0,
     });
   }
 
@@ -589,6 +592,7 @@ export function updateBattle(state: BattleState, dt: number): void {
   if (state.gameOver) return;
 
   const now = Date.now();
+  const FREEZE_DURATION_MS = 600;
 
   // Update timer
   state.timeRemaining = Math.max(
@@ -618,6 +622,7 @@ export function updateBattle(state: BattleState, dt: number): void {
   // Update units
   for (const unit of state.units) {
     if (!unit.alive) continue;
+    if (unit.frozenUntil > now) continue;
 
     const aiParams = getAIBehaviorParams(unit.aiLevel);
 
@@ -749,16 +754,16 @@ export function updateBattle(state: BattleState, dt: number): void {
     if (d < 0.5) {
       // Hit
       proj.alive = false;
-      // Apply damage to nearby enemies
+      const damagedUnits: Unit[] = [];
       if (proj.splashRadius > 0) {
         for (const unit of state.units) {
           if (unit.team !== proj.targetTeam || !unit.alive) continue;
           if (dist(unit.pos, proj.to) <= proj.splashRadius) {
             dealDamageToUnit(state, unit, proj.damage);
+            damagedUnits.push(unit);
           }
         }
       } else {
-        // Find nearest enemy at impact
         let nearest: Unit | null = null;
         let nearestD = 2;
         for (const unit of state.units) {
@@ -771,6 +776,13 @@ export function updateBattle(state: BattleState, dt: number): void {
         }
         if (nearest) {
           dealDamageToUnit(state, nearest, proj.damage);
+          damagedUnits.push(nearest);
+        }
+      }
+      const sourceUnit = state.units.find((u) => u.id === proj.sourceId);
+      if (sourceUnit?.cardDef.id === "maga") {
+        for (const u of damagedUnits) {
+          u.frozenUntil = now + FREEZE_DURATION_MS;
         }
       }
     } else {
