@@ -80,6 +80,8 @@ export interface Projectile {
   splashRadius: number;
   targetTeam: Team;
   sourceId: string;
+  /** Card id of the unit that fired (e.g. "maga" for Frost Mage freeze). Used when source unit may be dead. */
+  sourceCardId?: string;
   alive: boolean;
 }
 
@@ -592,7 +594,7 @@ export function updateBattle(state: BattleState, dt: number): void {
   if (state.gameOver) return;
 
   const now = Date.now();
-  const FREEZE_DURATION_MS = 600;
+  const FREEZE_DURATION_MS = 1000;
 
   // Update timer
   state.timeRemaining = Math.max(
@@ -658,7 +660,6 @@ export function updateBattle(state: BattleState, dt: number): void {
         unit.lastAttackTime = now;
 
         if (unit.hasProjectile) {
-          // Fire projectile
           state.projectiles.push({
             id: `p_${state.nextProjectileId++}`,
             from: { ...unit.pos },
@@ -669,6 +670,7 @@ export function updateBattle(state: BattleState, dt: number): void {
             splashRadius: unit.splashRadius,
             targetTeam: unit.team === "player" ? "bot" : "player",
             sourceId: unit.id,
+            sourceCardId: unit.cardDef.id,
             alive: true,
           });
         } else {
@@ -779,10 +781,11 @@ export function updateBattle(state: BattleState, dt: number): void {
           damagedUnits.push(nearest);
         }
       }
-      const sourceUnit = state.units.find((u) => u.id === proj.sourceId);
-      if (sourceUnit?.cardDef.id === "maga") {
+      const isFrostMageProj = proj.sourceCardId === "maga";
+      if (isFrostMageProj) {
         for (const u of damagedUnits) {
           u.frozenUntil = now + FREEZE_DURATION_MS;
+          u.lastAttackTime = now;
         }
       }
     } else {

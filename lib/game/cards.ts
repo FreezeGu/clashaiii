@@ -91,7 +91,7 @@ export const ALL_CARDS: CardDef[] = [
     hp: 350,
     damage: 65,
     attackRange: 5,
-    attackSpeed: 1.0,
+    attackSpeed: 0.65,
     moveSpeed: 1.6,
     targetType: "any",
     unitType: "ranged",
