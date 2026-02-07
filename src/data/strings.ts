@@ -1,0 +1,35 @@
+/** English + Italian microcopy for luxury UI */
+export const STRINGS = {
+  // Primary (English)
+  BATTLE: 'BATTLE',
+  DECK: 'Deck',
+  STORE: 'Store',
+  HOME: 'Home',
+  TROPHIES: 'Trophies',
+  VICTORY: 'Victory',
+  DEFEAT: 'Defeat',
+  DRAW: 'Draw',
+  PLAYER_NAME: 'Player Name',
+  CURRENT_DECK: 'Current Deck',
+  COLLECTION: 'Collection',
+  UPGRADE_AI: 'Upgrade AI',
+  ADD_TO_DECK: 'Add to Deck',
+  SWAP: 'Swap',
+  GOLD: 'Gold',
+  CARD_CRATE: 'Card Crate',
+  AI_MANUAL: 'AI Training Manual',
+  GOLD_PACK: 'Gold Pack',
+  DAILY_DEAL: 'Daily Deal',
+  BUY: 'Buy',
+  SETTINGS: 'Settings',
+  RESET_PROGRESS: 'Reset Progress',
+  NEXT: 'Next',
+
+  // Italian subtitles/labels
+  BATTAGLIA: 'Battaglia',
+  MAZZO: 'Mazzo',
+  NEGOZIO: 'Negozio',
+  TROFEI: 'Trofei',
+  VITTORIA: 'Vittoria',
+  SCONFITTA: 'Sconfitta',
+};
