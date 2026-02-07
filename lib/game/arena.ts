@@ -33,7 +33,7 @@ export const BRIDGE_RIGHT_X_END = 13;
 
 export const BRIDGE_HEIGHT_CELLS = RIVER_END - RIVER_START + 1;
 
-// ─── Lanes & Pocket (deploy territory after enemy princess destroyed) ─
+// ─── Lanes ────────────────────────────────────────────────────────
 /** Left lane: X ∈ [0 .. 8] */
 export const LEFT_LANE_X_MIN = 0;
 export const LEFT_LANE_X_MAX = 8;
@@ -41,16 +41,11 @@ export const LEFT_LANE_X_MAX = 8;
 export const RIGHT_LANE_X_MIN = 9;
 export const RIGHT_LANE_X_MAX = 17;
 
-/** Pocket depth (≈ 1/3 side). Pocket starts immediately after river on enemy side. */
-export const POCKET_DEPTH_TILES = 10;
-
-/** Enemy side (top): pocket = rows from (RIVER_END - POCKET_DEPTH_TILES + 1) to RIVER_START - 1 = 5..14 */
-export const POCKET_TOP_ROW_MIN = RIVER_START - POCKET_DEPTH_TILES; // 5
-export const POCKET_TOP_ROW_MAX = RIVER_START - 1; // 14
-
-/** Player side (bottom): pocket for bot = rows RIVER_END+1 .. RIVER_END+POCKET_DEPTH_TILES = 17..26 */
-export const POCKET_BOTTOM_ROW_MIN = RIVER_END + 1; // 17
-export const POCKET_BOTTOM_ROW_MAX = RIVER_END + POCKET_DEPTH_TILES; // 26
+// ─── Pocket (small zone behind destroyed princess tower only) ───────
+/** Depth of "behind" zone toward enemy backline (tiles). */
+export const POCKET_BACK_DEPTH_TILES = 3;
+/** Extra tiles to the sides of tower footprint (0 = strict behind only). */
+export const POCKET_SIDE_PADDING_TILES = 0;
 
 // ─── Tile types (single source of truth) ────────────────────────────
 export const TILE = {
@@ -212,12 +207,23 @@ export function isOnBridge(cellX: number, cellY: number): boolean {
   );
 }
 
-// ─── Deployment: territory mask, pocket, validators (CR rules) ─────────
+// ─── Deployment: territory mask, pocket (behind destroyed tower), validators ─
 export type TeamSide = "player" | "enemy";
 
+/** One pocket zone = ruins of destroyed princess tower + small "behind" rectangle. */
+export interface PocketRect {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
 export interface DeployTerritoryOptions {
-  pocketLeft: boolean;
-  pocketRight: boolean;
+  /** Legacy lane flags; ignored when pocketRects is set. */
+  pocketLeft?: boolean;
+  pocketRight?: boolean;
+  /** Pocket zones (behind each destroyed enemy princess). Takes precedence. */
+  pocketRects?: PocketRect[];
 }
 
 /** Base territory: own half only (no pocket). */
@@ -227,23 +233,22 @@ export function isInBaseTerritory(side: TeamSide, cellY: number): boolean {
   return isEnemyHalf(y);
 }
 
-/** Pocket: rectangle "lane × depth" immediately after river on enemy side. */
+/** Pocket: (x,y) inside any of the pocket rects (strict "behind tower" zones). */
 export function isInPocket(
-  side: TeamSide,
+  _side: TeamSide,
   options: DeployTerritoryOptions,
   cellX: number,
   cellY: number
 ): boolean {
   const x = Math.floor(cellX);
   const y = Math.floor(cellY);
-  const inLeftLane = x >= LEFT_LANE_X_MIN && x <= LEFT_LANE_X_MAX;
-  const inRightLane = x >= RIGHT_LANE_X_MIN && x <= RIGHT_LANE_X_MAX;
-  if (!((options.pocketLeft && inLeftLane) || (options.pocketRight && inRightLane)))
-    return false;
-  if (side === "player") {
-    return y >= POCKET_TOP_ROW_MIN && y <= POCKET_TOP_ROW_MAX;
+  const rects = options.pocketRects;
+  if (rects?.length) {
+    return rects.some(
+      (r) => x >= r.xMin && x <= r.xMax && y >= r.yMin && y <= r.yMax
+    );
   }
-  return y >= POCKET_BOTTOM_ROW_MIN && y <= POCKET_BOTTOM_ROW_MAX;
+  return false;
 }
 
 /** Full deploy territory: base + pocket (after enemy princess tower destroyed). */
@@ -281,10 +286,7 @@ export function canPlaceTroop(
   cellY: number,
   side: TeamSide
 ): boolean {
-  return canPlaceTroopDeploy(engineGrid, cellX, cellY, side, {
-    pocketLeft: false,
-    pocketRight: false,
-  });
+  return canPlaceTroopDeploy(engineGrid, cellX, cellY, side, { pocketRects: [] });
 }
 
 /** Footprint sizes (width × height in cells). Anchor = top-left. */
@@ -337,7 +339,7 @@ export function canPlaceBuildingEngine(
     cellY,
     footprint,
     side,
-    { pocketLeft: false, pocketRight: false },
+    { pocketRects: [] },
     () => false
   );
 }

@@ -216,10 +216,7 @@ export function BattleCanvas({
     }
 
     function drawDeployZoneHighlight(ctx: CanvasRenderingContext2D, state: BattleState) {
-      const territory = {
-        pocketLeft: state.playerPocketLeft,
-        pocketRight: state.playerPocketRight,
-      };
+      const territory = { pocketRects: state.playerPocketRects };
       for (let gy = 0; gy < GRID_H; gy++) {
         for (let gx = 0; gx < GRID_W; gx++) {
           if (!canPlaceTroopDeploy(state.grid, gx, gy, "player", territory)) continue;
@@ -235,10 +232,7 @@ export function BattleCanvas({
       state: BattleState,
       cell: { x: number; y: number }
     ) {
-      const territory = {
-        pocketLeft: state.playerPocketLeft,
-        pocketRight: state.playerPocketRight,
-      };
+      const territory = { pocketRects: state.playerPocketRects };
       const valid = canPlaceTroopDeploy(
         state.grid,
         cell.x,
@@ -254,10 +248,7 @@ export function BattleCanvas({
     }
 
     function drawDebugOverlay(ctx: CanvasRenderingContext2D, state: BattleState) {
-      const playerTerritory = {
-        pocketLeft: state.playerPocketLeft,
-        pocketRight: state.playerPocketRight,
-      };
+      const playerTerritory = { pocketRects: state.playerPocketRects };
       // Deploy territory (player): base half + pocket
       for (let gy = 0; gy < GRID_H; gy++) {
         for (let gx = 0; gx < GRID_W; gx++) {

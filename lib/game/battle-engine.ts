@@ -22,6 +22,9 @@ import {
   BRIDGE_LEFT_X_END,
   BRIDGE_RIGHT_X_START,
   BRIDGE_RIGHT_X_END,
+  POCKET_BACK_DEPTH_TILES,
+  POCKET_SIDE_PADDING_TILES,
+  type PocketRect,
 } from "./arena";
 
 // ─── Arena Constants (re-export for canvas/UI) ───────────────────────
@@ -56,7 +59,38 @@ export interface Tower {
   lastAttackTime: number;
   awake: boolean;
   destroyed: boolean;
-  size: number; // radius in grid cells
+  size: number; // visual/radius for drawing
+  /** Footprint in grid cells: 2 = princess 2×2, 3 = king 3×3. No buffer. */
+  footprintSize: 2 | 3;
+}
+
+export interface TowerFootprintBounds {
+  txMin: number;
+  txMax: number;
+  tyMin: number;
+  tyMax: number;
+}
+
+/** Bounds of tower footprint (2×2 or 3×3) in grid coordinates. */
+export function getTowerFootprintBounds(tower: Tower): TowerFootprintBounds {
+  const f = tower.footprintSize;
+  const cx = tower.pos.x;
+  const cy = tower.pos.y;
+  if (f === 2) {
+    return {
+      txMin: Math.floor(cx),
+      txMax: Math.floor(cx) + 1,
+      tyMin: Math.floor(cy),
+      tyMax: Math.floor(cy) + 1,
+    };
+  }
+  const half = 1;
+  return {
+    txMin: Math.floor(cx - half),
+    txMax: Math.floor(cx + half),
+    tyMin: Math.floor(cy - half),
+    tyMax: Math.floor(cy + half),
+  };
 }
 
 export interface Unit {
@@ -123,11 +157,9 @@ export interface BattleState {
   nextProjectileId: number;
   botLastPlayTime: number;
   botTrophyLevel: number;
-  /** Pocket deploy zone: player can deploy in enemy-side pocket after destroying that lane's princess tower. */
-  playerPocketLeft: boolean;
-  playerPocketRight: boolean;
-  botPocketLeft: boolean;
-  botPocketRight: boolean;
+  /** Pocket zones (behind each destroyed enemy princess). Small rects only. */
+  playerPocketRects: PocketRect[];
+  botPocketRects: PocketRect[];
 }
 
 // ─── Grid Setup (arena-driven) ───────────────────────────────────────
@@ -139,16 +171,14 @@ export function createGrid(): number[][] {
   return grid;
 }
 
-// Mark tower footprints on grid (blocked = 1 for pathfinding). Only for non-destroyed towers.
+// Mark tower footprints on grid (blocked = 1 for pathfinding). Only for non-destroyed towers. Exact 2×2 or 3×3, no buffer.
 function markTowerOnGrid(grid: number[][], tower: Tower) {
   if (tower.destroyed) return;
-  const r = Math.ceil(tower.size);
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      const gx = Math.floor(tower.pos.x + dx);
-      const gy = Math.floor(tower.pos.y + dy);
-      if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
-        if (grid[gy][gx] === 0) grid[gy][gx] = 1; // BLOCKED
+  const b = getTowerFootprintBounds(tower);
+  for (let gy = b.tyMin; gy <= b.tyMax; gy++) {
+    for (let gx = b.txMin; gx <= b.txMax; gx++) {
+      if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H && grid[gy][gx] === 0) {
+        grid[gy][gx] = 1; // BLOCKED
       }
     }
   }
@@ -156,13 +186,11 @@ function markTowerOnGrid(grid: number[][], tower: Tower) {
 
 /** Set tower footprint to RUINS (4): placeable & walkable. Call when tower is destroyed. */
 export function clearTowerFootprint(grid: number[][], tower: Tower): void {
-  const r = Math.ceil(tower.size);
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      const gx = Math.floor(tower.pos.x + dx);
-      const gy = Math.floor(tower.pos.y + dy);
+  const b = getTowerFootprintBounds(tower);
+  for (let gy = b.tyMin; gy <= b.tyMax; gy++) {
+    for (let gx = b.txMin; gx <= b.txMax; gx++) {
       if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H && grid[gy][gx] === 1) {
-        grid[gy][gx] = 4; // RUINS (decal on canvas, placeable & walkable)
+        grid[gy][gx] = 4; // RUINS
       }
     }
   }
@@ -173,16 +201,37 @@ export function getCrownTowerLane(towerId: string): "left" | "right" {
   return towerId.endsWith("_l") ? "left" : "right";
 }
 
+/** Pocket rect for a just-destroyed princess tower: ruins + "behind" zone toward enemy backline. */
+export function getPocketRectForDestroyedCrown(tower: Tower): PocketRect {
+  const b = getTowerFootprintBounds(tower);
+  const pad = POCKET_SIDE_PADDING_TILES;
+  const depth = POCKET_BACK_DEPTH_TILES;
+  if (tower.team === "bot") {
+    // Bot tower (top): behind = toward row 0
+    return {
+      xMin: Math.max(0, b.txMin - pad),
+      xMax: Math.min(GRID_W - 1, b.txMax + pad),
+      yMin: Math.max(0, b.tyMin - depth),
+      yMax: b.tyMax,
+    };
+  }
+  // Player tower (bottom): behind = toward row 31
+  return {
+    xMin: Math.max(0, b.txMin - pad),
+    xMax: Math.min(GRID_W - 1, b.txMax + pad),
+    yMin: b.tyMin,
+    yMax: Math.min(GRID_H - 1, b.tyMax + depth),
+  };
+}
+
 /** Set of "x,y" cells covered by live (non-destroyed) towers. For building deploy overlap check and debug overlay. */
 export function getLiveTowerFootprintCells(state: BattleState): Set<string> {
   const set = new Set<string>();
   for (const tower of state.towers) {
     if (tower.destroyed) continue;
-    const r = Math.ceil(tower.size);
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        const gx = Math.floor(tower.pos.x + dx);
-        const gy = Math.floor(tower.pos.y + dy);
+    const b = getTowerFootprintBounds(tower);
+    for (let gy = b.tyMin; gy <= b.tyMax; gy++) {
+      for (let gx = b.txMin; gx <= b.txMax; gx++) {
         if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) set.add(`${gx},${gy}`);
       }
     }
@@ -191,84 +240,91 @@ export function getLiveTowerFootprintCells(state: BattleState): Set<string> {
 }
 
 // ─── Tower Setup ───────────────────────────────────────────────────
+// Princess: 2×2 footprint, center at (4.5, 24.5) / (13.5, 24.5) player, (4.5, 7.5) / (13.5, 7.5) bot.
+// King: 3×3 footprint, center X = 8.5 (arena center), Y slightly below princess line.
+const CENTER_X = 8.5;
+
 function createTowers(): Tower[] {
-  const towerBase = {
+  const crownBase = {
     damage: 50,
     range: 5,
     attackSpeed: 0.8,
     lastAttackTime: 0,
     destroyed: false,
     size: 1.5,
+    footprintSize: 2 as const,
+  };
+  const kingBase = {
+    damage: 80,
+    range: 6,
+    attackSpeed: 0.8,
+    lastAttackTime: 0,
+    awake: false,
+    destroyed: false,
+    size: 2,
+    footprintSize: 3 as const,
   };
 
   return [
-    // Player towers (bottom)
+    // Player towers (bottom): princess 2×2, king 3×3 centered
     {
-      ...towerBase,
+      ...crownBase,
       id: "p_crown_l",
       team: "player" as Team,
       type: "crown" as TowerType,
-      pos: { x: 4, y: 24 },
+      pos: { x: 4.5, y: 24.5 },
       hp: 2000,
       maxHp: 2000,
       awake: true,
     },
     {
-      ...towerBase,
+      ...crownBase,
       id: "p_crown_r",
       team: "player" as Team,
       type: "crown" as TowerType,
-      pos: { x: 13, y: 24 },
+      pos: { x: 13.5, y: 24.5 },
       hp: 2000,
       maxHp: 2000,
       awake: true,
     },
     {
-      ...towerBase,
+      ...kingBase,
       id: "p_king",
       team: "player" as Team,
       type: "king" as TowerType,
-      pos: { x: 8.5, y: 28 },
+      pos: { x: CENTER_X, y: 26.5 },
       hp: 3500,
       maxHp: 3500,
-      damage: 80,
-      range: 6,
-      awake: false,
-      size: 2,
     },
     // Bot towers (top)
     {
-      ...towerBase,
+      ...crownBase,
       id: "b_crown_l",
       team: "bot" as Team,
       type: "crown" as TowerType,
-      pos: { x: 4, y: 7 },
+      pos: { x: 4.5, y: 7.5 },
       hp: 2000,
       maxHp: 2000,
       awake: true,
     },
     {
-      ...towerBase,
+      ...crownBase,
       id: "b_crown_r",
       team: "bot" as Team,
       type: "crown" as TowerType,
-      pos: { x: 13, y: 7 },
+      pos: { x: 13.5, y: 7.5 },
       hp: 2000,
       maxHp: 2000,
       awake: true,
     },
     {
-      ...towerBase,
+      ...kingBase,
       id: "b_king",
       team: "bot" as Team,
       type: "king" as TowerType,
-      pos: { x: 8.5, y: 3 },
+      pos: { x: CENTER_X, y: 3.5 },
       hp: 3500,
       maxHp: 3500,
-      damage: 80,
-      range: 6,
-      awake: false,
-      size: 2,
     },
   ];
 }
@@ -446,10 +502,8 @@ export function initBattle(
     nextProjectileId: 1,
     botLastPlayTime: 0,
     botTrophyLevel: trophies,
-    playerPocketLeft: false,
-    playerPocketRight: false,
-    botPocketLeft: false,
-    botPocketRight: false,
+    playerPocketRects: [],
+    botPocketRects: [],
   };
 }
 
@@ -511,12 +565,12 @@ export function playCardFromHand(
   const card = hand[handIndex];
   if (card.cardDef.cost > elixir) return false;
 
-  // Validate placement: deploy territory (base + pocket) + placeable tile; troops do not block each other
+  // Validate placement: deploy territory (base + pocket rects) + placeable tile
   const side: "player" | "enemy" = team === "player" ? "player" : "enemy";
   const territory =
     team === "player"
-      ? { pocketLeft: state.playerPocketLeft, pocketRight: state.playerPocketRight }
-      : { pocketLeft: state.botPocketLeft, pocketRight: state.botPocketRight };
+      ? { pocketRects: state.playerPocketRects }
+      : { pocketRects: state.botPocketRects };
   if (!canPlaceTroopDeploy(state.grid, pos.x, pos.y, side, territory)) return false;
 
   // Deduct elixir
@@ -894,16 +948,11 @@ function dealDamageToTower(
     tower.destroyed = true;
     // Ruins: clear footprint so deploy/pathfinding can use those cells
     clearTowerFootprint(state.grid, tower);
-    // Pocket: attacker gets deploy zone on enemy side in that lane (princess only)
+    // Pocket: attacker gets small zone behind this princess tower only
     if (tower.type === "crown") {
-      const lane = getCrownTowerLane(tower.id);
-      if (tower.team === "bot") {
-        if (lane === "left") state.playerPocketLeft = true;
-        else state.playerPocketRight = true;
-      } else {
-        if (lane === "left") state.botPocketLeft = true;
-        else state.botPocketRight = true;
-      }
+      const rect = getPocketRectForDestroyedCrown(tower);
+      if (tower.team === "bot") state.playerPocketRects.push(rect);
+      else state.botPocketRects.push(rect);
     }
     if (tower.team === "bot") {
       state.playerCrowns++;
