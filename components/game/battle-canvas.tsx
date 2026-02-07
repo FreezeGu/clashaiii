@@ -13,7 +13,11 @@ import {
   BRIDGE_RIGHT_COL_END,
 } from "@/lib/game/battle-engine";
 import {
-
+  canPlaceTroopDeploy,
+  isInPocket,
+  isInDeployTerritory,
+} from "@/lib/game/arena";
+import { useRef, useCallback, useEffect } from "react";
 
 interface BattleCanvasProps {
   stateRef: React.MutableRefObject<BattleState | null>;
