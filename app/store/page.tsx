@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react"
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { TopBar } from "@/components/game/top-bar";
 import { BottomNav } from "@/components/game/bottom-nav";
 import { useGameStore } from "@/lib/game/store";
@@ -10,7 +8,16 @@ import { COLLECTION_CARDS } from "@/lib/game/cards";
 import { Coins, Package, BookOpen, Gift, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function StorePage() {
+export default function StorePage({
+  params,
+  searchParams,
+}: {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+}) {
+  if (params) React.use(params);
+  if (searchParams) React.use(searchParams);
+
   const {
     gold,
     ownedCardIds,

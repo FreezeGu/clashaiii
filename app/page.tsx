@@ -1,12 +1,22 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { TopBar } from "@/components/game/top-bar";
 import { BottomNav } from "@/components/game/bottom-nav";
 import { useGameStore } from "@/lib/game/store";
 import { Swords, Trophy, Coins, Target } from "lucide-react";
 
-export default function HomePage() {
+export default function HomePage({
+  params,
+  searchParams,
+}: {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+}) {
+  if (params) React.use(params);
+  if (searchParams) React.use(searchParams);
+
   const { trophies, gold } = useGameStore();
 
   // Trophy tier name

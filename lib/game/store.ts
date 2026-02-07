@@ -130,6 +130,7 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: "torre-di-battaglia-store",
+      skipHydration: true,
     }
   )
 );

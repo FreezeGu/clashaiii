@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { BattleCanvas } from "@/components/game/battle-canvas";
 import { BattleUI } from "@/components/game/battle-ui";
 import { BattleEnd } from "@/components/game/battle-end";
@@ -19,7 +19,16 @@ import { TROPHY_WIN, TROPHY_LOSS } from "@/lib/game/store-config";
 const CANVAS_W = 360;
 const CANVAS_H = 640;
 
-export default function BattlePage() {
+export default function BattlePage({
+  params,
+  searchParams,
+}: {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+}) {
+  if (params) React.use(params);
+  if (searchParams) React.use(searchParams);
+
   const { deckIds, cardAiLevels, trophies, addTrophies, addGold } =
     useGameStore();
   const stateRef = useRef<BattleState | null>(null);

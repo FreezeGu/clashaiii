@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { TopBar } from "@/components/game/top-bar";
 import { BottomNav } from "@/components/game/bottom-nav";
 import { CardThumbnail } from "@/components/game/card-thumbnail";
@@ -10,7 +10,16 @@ import type { CardDef } from "@/lib/game/cards";
 import { ArrowRightLeft, Zap, X, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function DeckPage() {
+export default function DeckPage({
+  params,
+  searchParams,
+}: {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+}) {
+  if (params) React.use(params);
+  if (searchParams) React.use(searchParams);
+
   const {
     deckIds,
     ownedCardIds,
