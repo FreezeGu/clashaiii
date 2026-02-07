@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 6969",
+    "dev:turbo": "next dev --turbo -p 6969",
     "build": "next build",
     "preview": "next start -p 6969",
+    "start": "next build && next start -p 6969",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tools --max-warnings 0",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.tsx\" \"tools/**/*.ts\"",
