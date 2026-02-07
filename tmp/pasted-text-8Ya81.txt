@@ -1,0 +1,147 @@
+You are Cursor acting as a senior web game engineer + UI designer.
+
+Build a GOOD-LOOKING “base bones” playable prototype of an ORIGINAL tower-battle card game (same core loop as the described reference, but DO NOT copy any copyrighted names, logos, UI art, or assets). It must be web-ready and run out-of-the-box.
+
+MANDATORY TECH
+- Vite + React + TypeScript
+- Tailwind CSS (mobile-first). No custom CSS unless absolutely necessary.
+- Inter font via @fontsource/inter.
+- Persistence: localStorage (playerName, trophies, gold, ownedCards, deck[6], cardAiLevel).
+- Battle renderer: Phaser 3 inside a React component (canvas). React = all menus/UI; Phaser = battle arena + simulation.
+- Must run:
+  - npm install
+  - npm run dev
+  - npm run build
+
+MOBILE OPTIMIZATION (MANDATORY)
+- Layout must be “thumb-friendly”: large tap targets (min 44px), bottom nav always reachable.
+- Support touch drag for cards + tap-to-place fallback.
+- Use responsive scaling for the Phaser canvas and safe-area padding for iOS:
+  - respect env(safe-area-inset-*) in layout
+- Keep UI smooth: 60fps target, avoid heavy re-renders (memoize, use refs for Phaser bridge).
+- Add haptics-ready hooks (optional): simple vibration on placement if available.
+
+APP STRUCTURE (MUST IMPLEMENT)
+- React Router with 3 routes:
+  1) /  Home (Main Menu)
+  2) /deck
+  3) /store
+  4) /battle  (hosts Phaser canvas + minimal overlay UI)
+- Global state via a small store (Zustand or Context + reducer). Persist to localStorage.
+
+UI STYLE (PREMIUM / LUXURY)
+- Dark green/charcoal backgrounds, gold accents, ivory text. Clean spacing.
+- Use Tailwind to create a “luxury” feel: subtle gradients, soft shadows, thin borders, tasteful animations.
+- Sprinkle a little Italian microcopy: “Battaglia”, “Mazzo”, “Negozio”, “Trofei”, “Vittoria”, “Sconfitta”.
+- Use Inter everywhere.
+
+PAGES (REACT UI)
+1) Home Page
+- Top bar: Player Name (editable modal) + Trophy count.
+- Primary “BATTLE” button -> navigates to /battle.
+- Bottom nav tabs: Home / Mazzo / Negozio.
+
+2) Deck Page
+- Deck is exactly 6 cards for prototype.
+- Show 6 deck slots (thumbnail + AI Level badge).
+- Collection grid below with at least 10 cards. Tap a collection card -> modal:
+  - “Swap into Deck”
+  - “Upgrade AI” (costs gold; increases AI Level only; stats NEVER change)
+- Prevent deck from being less than 6.
+
+3) Store Page
+- Functional purchases using in-game gold:
+  - Gold Pack (+gold)
+  - AI Manual (discounted AI upgrade token)
+  - Card Crate (unlock random missing card or give shards)
+- Daily deal (random card highlight). Persist everything.
+
+BATTLE (PHASER) — BASE BONES BUT PLAYABLE
+Arena rules:
+- Top-down 2D arena with a river in the center and TWO bridges (left/right).
+- Two Crown Towers + one King Tower per side (player bottom, bot top).
+- Units cannot cross river except over bridges.
+- Towers shoot enemies in range with visible projectiles (travel time + impact).
+- King Tower starts asleep; activates only after taking damage.
+- 3:00 timer. Tie allowed for prototype.
+- End screen (React overlay) shows crowns + trophy change + rewards, then “Back to Home”.
+
+Cards + cycle (CRITICAL)
+- Player deck queue = 6 cards.
+- Hand = 4 cards displayed as React UI overlay at bottom in battle.
+- Proper cycle:
+  - Play card -> removed from hand -> appended to back of deck queue -> draw next into hand.
+- Elixir-like resource:
+  - max 10, regen 1 every ~2.8s (config)
+  - card cost 1–6
+- Placement:
+  - Drag card from hand onto arena (touch drag supported).
+  - Tap-to-place fallback: tap a card, then tap location.
+  - Only allow placement on player half (below river).
+  - Block river, bridges-only crossing, and tower footprints.
+
+Units (ORIGINAL NAMES + PLACEHOLDER ART)
+Implement only 8 units for prototype (balanced-ish). Stats fixed across levels:
+- 2 melee, 2 swarm, 2 ranged projectile, 1 tank that prefers towers, 1 splash unit.
+Each card data includes:
+- id, name (original), cost, hp, damage, attackRange, attackSpeed, moveSpeed, targetType, splashRadius(optional), projectile(optional)
+AI-level twist (base implementation):
+- Card has aiLevel 1..10.
+- aiLevel changes ONLY behavior params:
+  - reactionDelayMs decreases with level
+  - targetRecheckMs decreases with level
+  - ranged units get simple “kiteDistance” at higher levels
+This must be noticeable in gameplay.
+
+Movement + pathing (MUST RESPECT BRIDGES)
+- Use a small grid for the arena.
+- River tiles blocked except bridge tiles.
+- Tower footprints blocked.
+- Implement simple A* pathfinding (enough to route to targets and around obstacles).
+- Units pick targets:
+  - nearest enemy unit in lane; if none, go toward nearest enemy Crown Tower.
+  - tank unit has strong tower bias.
+
+Bot opponent (simple but trophy-scaled)
+- No multiplayer.
+- Bot has its own deck and hand cycle.
+- Bot difficulty scales by trophies:
+  - low trophies: slow reactions, random-ish placements, wastes elixir
+  - higher trophies: faster reactions, defends threatened lane, occasional counter-push
+- Trophy changes:
+  - Win +30, Loss -15, Tie 0 (prototype)
+- Persist trophies.
+
+ASSETS (OUT-OF-THE-BOX)
+- Create original placeholder art locally:
+  - card thumbnails (simple SVGs or generated shapes)
+  - unit sprites (simple circles/rectangles with accents) + tiny animations via Phaser tweens
+  - projectiles (small sprites)
+  - arena tiles (simple shapes/colors)
+No external copyrighted images.
+
+CODE ORGANIZATION (MANDATORY)
+- src/
+  - app/ (routes, pages)
+  - components/ (TopBar, BottomNav, Card, Modals)
+  - state/ (store + persistence)
+  - data/ (cards, costs, ai params)
+  - battle/
+    - PhaserGame.ts (factory)
+    - BattleScene.ts
+    - sim/ (entities, systems: movement, combat, targeting, projectiles, pathfinding)
+    - bridge/ (React <-> Phaser events: playCard, placement, matchEnd)
+- Provide clean types and comments.
+
+PERFORMANCE REQUIREMENTS
+- Avoid React re-rendering at 60fps: battle state stays mostly inside Phaser.
+- React overlay only updates low-frequency state (elixir, hand, timer).
+- Use requestAnimationFrame only in Phaser; keep React state updates throttled.
+
+DELIVERABLES
+- Complete repo with all files (not fragments).
+- README: how to run, controls (touch + mouse), how card cycle works, how AI levels affect behavior.
+- The prototype must be playable: Home -> Battle -> Result -> Home, plus Deck and Store functional.
+
+Now generate the entire working codebase and all necessary files.
+Write complete files. No TODOs for core gameplay.
