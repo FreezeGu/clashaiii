@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { BattleCanvas } from "@/components/game/battle-canvas";
-import { BattleUI } from "@/components/game/battle-ui";
+import { BattleTopHUD, BattleBottomHUD } from "@/components/game/battle-ui";
 import { BattleEnd } from "@/components/game/battle-end";
 import { useGameStore } from "@/lib/game/store";
 import { COLLECTION_CARDS, ALL_CARDS } from "@/lib/game/cards";
@@ -10,14 +10,14 @@ import {
   initBattle,
   updateBattle,
   playCardFromHand,
-  RIVER_ROW_END,
   type BattleState,
 } from "@/lib/game/battle-engine";
 import { TROPHY_WIN, TROPHY_LOSS } from "@/lib/game/store-config";
-
-// Canvas size (logical pixels, will be scaled by CSS)
-const CANVAS_W = 360;
-const CANVAS_H = 640;
+import {
+  CANVAS_LOGICAL_W,
+  CANVAS_LOGICAL_H,
+  ARENA_MIN_H_PX,
+} from "@/lib/game/battle-layout";
 
 export default function BattlePage({
   params,
@@ -27,7 +27,9 @@ export default function BattlePage({
   searchParams?: Promise<Record<string, string | string[]>>;
 }) {
   if (params) React.use(params);
-  if (searchParams) React.use(searchParams);
+  const resolvedSearchParams = searchParams ? React.use(searchParams) : undefined;
+  const showDebugOverlay =
+    resolvedSearchParams?.debug === "1" || resolvedSearchParams?.debug === "true";
 
   const { deckIds, cardAiLevels, trophies, addTrophies, addGold } =
     useGameStore();
@@ -145,19 +147,16 @@ export default function BattlePage({
     if (!state || state.gameOver) return;
 
     if (state.selectedHandIndex !== null) {
-      // Validate player half (below river)
-      if (gridY > RIVER_ROW_END) {
-        const success = playCardFromHand(
-          state,
-          state.selectedHandIndex,
-          { x: gridX, y: gridY },
-          "player"
-        );
-        if (success) {
-          // Haptic feedback
-          if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-            navigator.vibrate(30);
-          }
+      // Deploy territory (base + pocket) and placeable check done inside playCardFromHand
+      const success = playCardFromHand(
+        state,
+        state.selectedHandIndex,
+        { x: gridX, y: gridY },
+        "player"
+      );
+      if (success) {
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          navigator.vibrate(30);
         }
       }
       state.selectedHandIndex = null;
@@ -165,44 +164,52 @@ export default function BattlePage({
   }, []);
 
   return (
-    <div className="relative w-full h-dvh bg-charcoal overflow-hidden flex items-center justify-center">
-      {/* Canvas container */}
+    <div className="flex flex-col w-full h-dvh bg-[hsl(var(--charcoal))] overflow-hidden">
+      {/* 1. Top HUD — fixed zone, never overlaps arena */}
+      <BattleTopHUD
+        timeRemaining={uiState.timeRemaining}
+        playerCrowns={uiState.playerCrowns}
+        botCrowns={uiState.botCrowns}
+      />
+
+      {/* 2. Arena — only zone with canvas; flex-1, min height, centered. Canvas never under Bottom HUD. */}
       <div
-        className="relative"
-        style={{
-          width: "100%",
-          maxWidth: `${CANVAS_W}px`,
-          aspectRatio: `${CANVAS_W}/${CANVAS_H}`,
-          maxHeight: "100dvh",
-        }}
+        className="flex-1 flex items-center justify-center overflow-hidden px-2 py-2"
+        style={{ minHeight: ARENA_MIN_H_PX }}
       >
-        <BattleCanvas
-          stateRef={stateRef}
-          onCanvasTap={handleCanvasTap}
-          canvasWidth={CANVAS_W}
-          canvasHeight={CANVAS_H}
-        />
+        <div
+          className="max-h-full max-w-full rounded-xl border-2 border-border shadow-lg overflow-hidden bg-[hsl(var(--charcoal-light))]"
+          style={{ aspectRatio: `${CANVAS_LOGICAL_W}/${CANVAS_LOGICAL_H}` }}
+        >
+          <BattleCanvas
+              stateRef={stateRef}
+              onCanvasTap={handleCanvasTap}
+              canvasWidth={CANVAS_LOGICAL_W}
+              canvasHeight={CANVAS_LOGICAL_H}
+              selectedHandIndex={uiState.selectedIndex}
+              showDebugOverlay={showDebugOverlay}
+            />
+        </div>
+      </div>
 
-        {/* UI overlay */}
-        <BattleUI
-          hand={uiState.hand}
-          elixir={uiState.elixir}
-          timeRemaining={uiState.timeRemaining}
-          selectedIndex={uiState.selectedIndex}
-          playerCrowns={uiState.playerCrowns}
-          botCrowns={uiState.botCrowns}
-          onSelectCard={handleSelectCard}
-        />
+      {/* 3. Bottom HUD — card bar + elixir; never overlaps canvas */}
+      <BattleBottomHUD
+        hand={uiState.hand}
+        elixir={uiState.elixir}
+        selectedIndex={uiState.selectedIndex}
+        onSelectCard={handleSelectCard}
+      />
 
-        {/* End screen */}
-        {uiState.gameOver && uiState.winner && (
+      {/* End screen overlay (above everything) */}
+      {uiState.gameOver && uiState.winner && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/60">
           <BattleEnd
             winner={uiState.winner}
             playerCrowns={uiState.playerCrowns}
             botCrowns={uiState.botCrowns}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

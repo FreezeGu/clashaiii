@@ -10,16 +10,29 @@ import {
   ELIXIR_REGEN_MS,
   BATTLE_DURATION_S,
 } from "./store-config";
+import {
+  createArenaGrid,
+  arenaTileToEngineCell,
+  canPlaceTroopDeploy,
+  GRID_WIDTH,
+  GRID_HEIGHT,
+  RIVER_START,
+  RIVER_END,
+  BRIDGE_LEFT_X_START,
+  BRIDGE_LEFT_X_END,
+  BRIDGE_RIGHT_X_START,
+  BRIDGE_RIGHT_X_END,
+} from "./arena";
 
-// ─── Arena Constants ───────────────────────────────────────────────
-export const GRID_W = 18;
-export const GRID_H = 32;
-export const RIVER_ROW_START = 15;
-export const RIVER_ROW_END = 16;
-export const BRIDGE_LEFT_COL_START = 3;
-export const BRIDGE_LEFT_COL_END = 5;
-export const BRIDGE_RIGHT_COL_START = 12;
-export const BRIDGE_RIGHT_COL_END = 14;
+// ─── Arena Constants (re-export for canvas/UI) ───────────────────────
+export const GRID_W = GRID_WIDTH;
+export const GRID_H = GRID_HEIGHT;
+export const RIVER_ROW_START = RIVER_START;
+export const RIVER_ROW_END = RIVER_END;
+export const BRIDGE_LEFT_COL_START = BRIDGE_LEFT_X_START;
+export const BRIDGE_LEFT_COL_END = BRIDGE_LEFT_X_END;
+export const BRIDGE_RIGHT_COL_START = BRIDGE_RIGHT_X_START;
+export const BRIDGE_RIGHT_COL_END = BRIDGE_RIGHT_X_END;
 
 // ─── Types ─────────────────────────────────────────────────────────
 export type Team = "player" | "bot";
@@ -87,7 +100,7 @@ export interface HandCard {
 }
 
 export interface BattleState {
-  grid: number[][]; // 0=walkable, 1=blocked, 2=river, 3=bridge
+  grid: number[][]; // 0=walkable/ground/ruins, 1=blocked (live tower), 2=river, 3=bridge
   towers: Tower[];
   units: Unit[];
   projectiles: Projectile[];
@@ -110,42 +123,71 @@ export interface BattleState {
   nextProjectileId: number;
   botLastPlayTime: number;
   botTrophyLevel: number;
+  /** Pocket deploy zone: player can deploy in enemy-side pocket after destroying that lane's princess tower. */
+  playerPocketLeft: boolean;
+  playerPocketRight: boolean;
+  botPocketLeft: boolean;
+  botPocketRight: boolean;
 }
 
-// ─── Grid Setup ────────────────────────────────────────────────────
+// ─── Grid Setup (arena-driven) ───────────────────────────────────────
 export function createGrid(): number[][] {
-  const grid: number[][] = [];
-  for (let y = 0; y < GRID_H; y++) {
-    const row: number[] = [];
-    for (let x = 0; x < GRID_W; x++) {
-      if (y >= RIVER_ROW_START && y <= RIVER_ROW_END) {
-        // Check if on a bridge
-        const onLeftBridge =
-          x >= BRIDGE_LEFT_COL_START && x <= BRIDGE_LEFT_COL_END;
-        const onRightBridge =
-          x >= BRIDGE_RIGHT_COL_START && x <= BRIDGE_RIGHT_COL_END;
-        row.push(onLeftBridge || onRightBridge ? 3 : 2);
-      } else {
-        row.push(0);
-      }
-    }
-    grid.push(row);
-  }
+  const arenaGrid = createArenaGrid();
+  const grid: number[][] = arenaGrid.map((row) =>
+    row.map((tile) => arenaTileToEngineCell(tile))
+  );
   return grid;
 }
 
-// Mark tower footprints on grid
+// Mark tower footprints on grid (blocked = 1 for pathfinding). Only for non-destroyed towers.
 function markTowerOnGrid(grid: number[][], tower: Tower) {
+  if (tower.destroyed) return;
   const r = Math.ceil(tower.size);
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
       const gx = Math.floor(tower.pos.x + dx);
       const gy = Math.floor(tower.pos.y + dy);
       if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
-        if (grid[gy][gx] === 0) grid[gy][gx] = 1;
+        if (grid[gy][gx] === 0) grid[gy][gx] = 1; // BLOCKED
       }
     }
   }
+}
+
+/** Set tower footprint to RUINS (4): placeable & walkable. Call when tower is destroyed. */
+export function clearTowerFootprint(grid: number[][], tower: Tower): void {
+  const r = Math.ceil(tower.size);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const gx = Math.floor(tower.pos.x + dx);
+      const gy = Math.floor(tower.pos.y + dy);
+      if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H && grid[gy][gx] === 1) {
+        grid[gy][gx] = 4; // RUINS (decal on canvas, placeable & walkable)
+      }
+    }
+  }
+}
+
+/** Lane of crown tower by id: "p_crown_l" / "b_crown_l" => left, _r => right. */
+export function getCrownTowerLane(towerId: string): "left" | "right" {
+  return towerId.endsWith("_l") ? "left" : "right";
+}
+
+/** Set of "x,y" cells covered by live (non-destroyed) towers. For building deploy overlap check and debug overlay. */
+export function getLiveTowerFootprintCells(state: BattleState): Set<string> {
+  const set = new Set<string>();
+  for (const tower of state.towers) {
+    if (tower.destroyed) continue;
+    const r = Math.ceil(tower.size);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const gx = Math.floor(tower.pos.x + dx);
+        const gy = Math.floor(tower.pos.y + dy);
+        if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) set.add(`${gx},${gy}`);
+      }
+    }
+  }
+  return set;
 }
 
 // ─── Tower Setup ───────────────────────────────────────────────────
@@ -404,6 +446,10 @@ export function initBattle(
     nextProjectileId: 1,
     botLastPlayTime: 0,
     botTrophyLevel: trophies,
+    playerPocketLeft: false,
+    playerPocketRight: false,
+    botPocketLeft: false,
+    botPocketRight: false,
   };
 }
 
@@ -465,21 +511,13 @@ export function playCardFromHand(
   const card = hand[handIndex];
   if (card.cardDef.cost > elixir) return false;
 
-  // Validate placement (player can only place on their half)
-  if (team === "player" && pos.y < RIVER_ROW_END + 1) return false;
-  if (team === "bot" && pos.y > RIVER_ROW_START - 1) return false;
-
-  // Check grid is walkable at placement
-  const gx = Math.round(pos.x);
-  const gy = Math.round(pos.y);
-  if (
-    gx < 0 ||
-    gx >= GRID_W ||
-    gy < 0 ||
-    gy >= GRID_H
-  )
-    return false;
-  if (state.grid[gy][gx] === 1 || state.grid[gy][gx] === 2) return false;
+  // Validate placement: deploy territory (base + pocket) + placeable tile; troops do not block each other
+  const side: "player" | "enemy" = team === "player" ? "player" : "enemy";
+  const territory =
+    team === "player"
+      ? { pocketLeft: state.playerPocketLeft, pocketRight: state.playerPocketRight }
+      : { pocketLeft: state.botPocketLeft, pocketRight: state.botPocketRight };
+  if (!canPlaceTroopDeploy(state.grid, pos.x, pos.y, side, territory)) return false;
 
   // Deduct elixir
   if (team === "player") {
@@ -854,14 +892,24 @@ function dealDamageToTower(
 
   if (tower.hp <= 0) {
     tower.destroyed = true;
-    // Award crown
+    // Ruins: clear footprint so deploy/pathfinding can use those cells
+    clearTowerFootprint(state.grid, tower);
+    // Pocket: attacker gets deploy zone on enemy side in that lane (princess only)
+    if (tower.type === "crown") {
+      const lane = getCrownTowerLane(tower.id);
+      if (tower.team === "bot") {
+        if (lane === "left") state.playerPocketLeft = true;
+        else state.playerPocketRight = true;
+      } else {
+        if (lane === "left") state.botPocketLeft = true;
+        else state.botPocketRight = true;
+      }
+    }
     if (tower.team === "bot") {
       state.playerCrowns++;
     } else {
       state.botCrowns++;
     }
-
-    // Wake up king tower of same team
     const king = state.towers.find(
       (t) => t.team === tower.team && t.type === "king" && !t.destroyed
     );
