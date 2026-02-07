@@ -138,12 +138,17 @@ export function BattleUI({
                       : "border-border/50 bg-charcoal-light/50 opacity-50"
                 )}
               >
-                {/* Cost */}
+                {/* Level - top left */}
+                <div className="absolute -top-2 left-0 min-w-[22px] h-5 px-1 rounded flex items-center justify-center text-[9px] font-bold bg-foreground/90 text-background">
+                  {card.aiLevel}
+                </div>
+
+                {/* Elixir - top right (purple) */}
                 <div
                   className={cn(
-                    "absolute -top-2 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold",
+                    "absolute -top-2 right-0 min-w-[22px] h-5 px-1 rounded flex items-center justify-center text-[9px] font-bold",
                     canAfford
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-purple-500/90 text-white"
                       : "bg-muted text-muted-foreground"
                   )}
                 >

@@ -1,8 +1,14 @@
 "use client";
 
-import React from "react";
-import { useRef, useEffect, useCallback } from "react";
-import type { BattleState } from "@/lib/game/battle-engine";
+import { useRef, useEffect } from "react";
+import type { CardDef } from "@/lib/game/cards";
+import { ALL_CARDS } from "@/lib/game/cards";
+import {
+  initBattle,
+  updateBattle,
+  playCardFromHand,
+  type BattleState,
+} from "@/lib/game/battle-engine";
 import {
   GRID_W,
   GRID_H,
@@ -20,56 +26,31 @@ import {
   getIdleFramePath,
 } from "@/lib/game/unit-sprites";
 
-interface BattleCanvasProps {
-  stateRef: React.MutableRefObject<BattleState | null>;
-  onCanvasTap: (gridX: number, gridY: number) => void;
-  canvasWidth: number;
-  canvasHeight: number;
-}
+const ARCHER_ID = "arciere";
+const CELL = 18;
+const W = GRID_W * CELL;
+// Only show top portion of arena (bot side + river + bit of player side)
+const VISIBLE_GRID_ROWS = 22;
+const H = VISIBLE_GRID_ROWS * CELL;
+const RESET_AFTER_MS = 12000;
+const PREVIEW_DISPLAY_SCALE = 0.88;
 
-export function BattleCanvas({
-  stateRef,
-  onCanvasTap,
-  canvasWidth,
-  canvasHeight,
-}: BattleCanvasProps) {
+const OPPONENT_NAME = "Rival";
+
+export function MiniBattlePreview({
+  card,
+  playerName = "You",
+}: {
+  card: CardDef;
+  playerName?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animFrameRef = useRef<number>(0);
+  const stateRef = useRef<BattleState | null>(null);
+  const lastTickRef = useRef<number>(0);
   const spritesRef = useRef<Record<
     string,
     { walk: HTMLImageElement[]; attack: HTMLImageElement[]; idle?: HTMLImageElement[] }
   >>({});
-
-  const cellW = canvasWidth / GRID_W;
-  const cellH = canvasHeight / GRID_H;
-
-  const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      let clientX: number, clientY: number;
-
-      if ("touches" in e) {
-        if (e.touches.length === 0) return;
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-      }
-
-      const x = ((clientX - rect.left) / rect.width) * canvasWidth;
-      const y = ((clientY - rect.top) / rect.height) * canvasHeight;
-
-      const gridX = x / cellW;
-      const gridY = y / cellH;
-
-      onCanvasTap(gridX, gridY);
-    },
-    [canvasWidth, canvasHeight, cellW, cellH, onCanvasTap]
-  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,7 +58,9 @@ export function BattleCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Preload unit sprites (walk, attack, idle when configured)
+    const cellW = CELL;
+    const cellH = CELL;
+
     for (const [cardId, config] of Object.entries(UNIT_SPRITE_CONFIG)) {
       const walkImgs: HTMLImageElement[] = [];
       const attackImgs: HTMLImageElement[] = [];
@@ -86,7 +69,6 @@ export function BattleCanvas({
       let walkLoaded = 0;
       let attackLoaded = 0;
       let idleLoaded = 0;
-
       const maybeSet = () => {
         if (
           walkLoaded === config.walkFrames &&
@@ -100,7 +82,6 @@ export function BattleCanvas({
           };
         }
       };
-
       for (let i = 1; i <= config.walkFrames; i++) {
         const img = new Image();
         img.src = getWalkFramePath(cardId, i);
@@ -132,155 +113,104 @@ export function BattleCanvas({
       }
     }
 
-    function render() {
-      if (!ctx) return;
-      const state = stateRef.current;
-      if (!state) {
-        animFrameRef.current = requestAnimationFrame(render);
-        return;
-      }
+    function init(): BattleState {
+      const archer = ALL_CARDS.find((c) => c.id === ARCHER_ID);
+      if (!archer) throw new Error("Archer card not found");
 
-      // Clear
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      const playerCards = Array.from({ length: 6 }, () => ({
+        cardDef: card,
+        aiLevel: 1,
+      }));
+      const botCards = Array.from({ length: 6 }, () => ({
+        cardDef: archer,
+        aiLevel: 1,
+      }));
 
-      // Draw arena background
-      drawArena(ctx, state);
+      const state = initBattle(playerCards, botCards, 0);
+      state.playerElixir = 10;
+      state.botElixir = 10;
+      state.lastElixirRegenPlayer = Date.now();
+      state.lastElixirRegenBot = Date.now();
 
-      // Draw towers
-      drawTowers(ctx, state);
+      const now = Date.now();
+      state.startTime = now;
 
-      // Draw units
-      drawUnits(ctx, state);
+      // Spawn in visible top portion: player just below river (y=20), bots above
+      const playerSpots = [{ x: 8.5, y: 20 }, { x: 5, y: 20 }, { x: 12, y: 20 }];
+      const botSpots = [{ x: 6, y: 8 }, { x: 11, y: 8 }];
+      let ok = playCardFromHand(state, 0, playerSpots[0], "player");
+      if (!ok) ok = playCardFromHand(state, 0, playerSpots[1], "player");
+      if (!ok) playCardFromHand(state, 0, playerSpots[2], "player");
+      playCardFromHand(state, 0, botSpots[0], "bot");
+      playCardFromHand(state, 1, botSpots[1], "bot");
 
-      // Draw projectiles
-      drawProjectiles(ctx, state);
-
-      animFrameRef.current = requestAnimationFrame(render);
+      return state;
     }
 
-    function drawArena(ctx: CanvasRenderingContext2D, state: BattleState) {
-      // Background
+    stateRef.current = init();
+    lastTickRef.current = performance.now();
+    let animId = 0;
+    let resetAt = Date.now() + RESET_AFTER_MS;
+
+    function drawArena(ctx: CanvasRenderingContext2D) {
       ctx.fillStyle = "#1a3a2a";
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-      // Player half (slightly lighter green)
-      ctx.fillStyle = "#1e4432";
-      ctx.fillRect(
-        0,
-        (RIVER_ROW_END + 1) * cellH,
-        canvasWidth,
-        (GRID_H - RIVER_ROW_END - 1) * cellH
-      );
-
-      // Bot half
+      ctx.fillRect(0, 0, W, H);
+      const clipY = Math.min(H, (RIVER_ROW_END + 1) * cellH);
+      if (clipY < H) {
+        ctx.fillStyle = "#1e4432";
+        ctx.fillRect(0, clipY, W, H - clipY);
+      }
       ctx.fillStyle = "#1a3a2a";
-      ctx.fillRect(0, 0, canvasWidth, RIVER_ROW_START * cellH);
-
-      // River
+      ctx.fillRect(0, 0, W, Math.min(H, RIVER_ROW_START * cellH));
       ctx.fillStyle = "#1a5f8a";
-      ctx.fillRect(
-        0,
-        RIVER_ROW_START * cellH,
-        canvasWidth,
-        (RIVER_ROW_END - RIVER_ROW_START + 1) * cellH
-      );
-
-      // River wave lines
+      const riverTop = RIVER_ROW_START * cellH;
+      const riverH = (RIVER_ROW_END - RIVER_ROW_START + 1) * cellH;
+      ctx.fillRect(0, riverTop, W, Math.min(riverH, H - riverTop));
       ctx.strokeStyle = "#2080b0";
       ctx.lineWidth = 1;
       for (let i = 0; i < 3; i++) {
-        const y =
-          (RIVER_ROW_START + 0.3 + i * 0.5) * cellH;
+        const y = (RIVER_ROW_START + 0.3 + i * 0.5) * cellH;
         ctx.beginPath();
-        for (let x = 0; x < canvasWidth; x += 4) {
-          ctx.lineTo(
-            x,
-            y + Math.sin(x * 0.05 + Date.now() * 0.003 + i) * 2
-          );
+        for (let x = 0; x < W; x += 4) {
+          ctx.lineTo(x, y + Math.sin(x * 0.05 + Date.now() * 0.003 + i) * 2);
         }
         ctx.stroke();
       }
-
-      // Bridges
-      drawBridge(ctx, BRIDGE_LEFT_COL_START, BRIDGE_LEFT_COL_END);
-      drawBridge(ctx, BRIDGE_RIGHT_COL_START, BRIDGE_RIGHT_COL_END);
-
-      // Grid lines (subtle)
-      ctx.strokeStyle = "rgba(255,255,255,0.03)";
-      ctx.lineWidth = 0.5;
-      for (let x = 0; x <= GRID_W; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * cellW, 0);
-        ctx.lineTo(x * cellW, canvasHeight);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= GRID_H; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * cellH);
-        ctx.lineTo(canvasWidth, y * cellH);
-        ctx.stroke();
-      }
-
-      // Center line
-      ctx.strokeStyle = "rgba(255,215,0,0.15)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(0, ((RIVER_ROW_START + RIVER_ROW_END) / 2 + 0.5) * cellH);
-      ctx.lineTo(
-        canvasWidth,
-        ((RIVER_ROW_START + RIVER_ROW_END) / 2 + 0.5) * cellH
-      );
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    function drawBridge(
-      ctx: CanvasRenderingContext2D,
-      colStart: number,
-      colEnd: number
-    ) {
-      ctx.fillStyle = "#5c4a32";
-      ctx.fillRect(
-        colStart * cellW,
-        RIVER_ROW_START * cellH,
-        (colEnd - colStart + 1) * cellW,
-        (RIVER_ROW_END - RIVER_ROW_START + 1) * cellH
-      );
-
-      // Bridge planks
-      ctx.strokeStyle = "#7a6544";
-      ctx.lineWidth = 1;
-      for (let i = colStart; i <= colEnd; i++) {
-        ctx.beginPath();
-        ctx.moveTo(
-          (i + 0.5) * cellW,
-          RIVER_ROW_START * cellH
+      function drawBridge(colStart: number, colEnd: number) {
+        ctx.fillStyle = "#5c4a32";
+        ctx.fillRect(
+          colStart * cellW,
+          RIVER_ROW_START * cellH,
+          (colEnd - colStart + 1) * cellW,
+          (RIVER_ROW_END - RIVER_ROW_START + 1) * cellH
         );
-        ctx.lineTo(
-          (i + 0.5) * cellW,
-          (RIVER_ROW_END + 1) * cellH
-        );
+        ctx.strokeStyle = "#7a6544";
+        ctx.lineWidth = 1;
+        for (let i = colStart; i <= colEnd; i++) {
+          ctx.beginPath();
+          ctx.moveTo((i + 0.5) * cellW, RIVER_ROW_START * cellH);
+          ctx.lineTo((i + 0.5) * cellW, (RIVER_ROW_END + 1) * cellH);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = "#8b7450";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(colStart * cellW, RIVER_ROW_START * cellH);
+        ctx.lineTo(colStart * cellW, (RIVER_ROW_END + 1) * cellH);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo((colEnd + 1) * cellW, RIVER_ROW_START * cellH);
+        ctx.lineTo((colEnd + 1) * cellW, (RIVER_ROW_END + 1) * cellH);
         ctx.stroke();
       }
-
-      // Bridge rails
-      ctx.strokeStyle = "#8b7450";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(colStart * cellW, RIVER_ROW_START * cellH);
-      ctx.lineTo(colStart * cellW, (RIVER_ROW_END + 1) * cellH);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo((colEnd + 1) * cellW, RIVER_ROW_START * cellH);
-      ctx.lineTo((colEnd + 1) * cellW, (RIVER_ROW_END + 1) * cellH);
-      ctx.stroke();
+      drawBridge(BRIDGE_LEFT_COL_START, BRIDGE_LEFT_COL_END);
+      drawBridge(BRIDGE_RIGHT_COL_START, BRIDGE_RIGHT_COL_END);
     }
 
     function drawTowers(ctx: CanvasRenderingContext2D, state: BattleState) {
       for (const tower of state.towers) {
+        if (tower.pos.y >= VISIBLE_GRID_ROWS) continue;
         if (tower.destroyed) {
-          // Draw rubble
           ctx.fillStyle = "rgba(100,100,100,0.3)";
           ctx.beginPath();
           ctx.arc(
@@ -293,14 +223,9 @@ export function BattleCanvas({
           ctx.fill();
           continue;
         }
-
         const isPlayer = tower.team === "player";
         const isKing = tower.type === "king";
-
-        // Tower body
         const radius = tower.size * cellW * 0.65;
-
-        // Shadow
         ctx.fillStyle = "rgba(0,0,0,0.3)";
         ctx.beginPath();
         ctx.ellipse(
@@ -313,8 +238,6 @@ export function BattleCanvas({
           Math.PI * 2
         );
         ctx.fill();
-
-        // Base
         ctx.fillStyle = isPlayer ? "#2a6e4e" : "#6e2a2a";
         ctx.beginPath();
         ctx.arc(
@@ -325,13 +248,9 @@ export function BattleCanvas({
           Math.PI * 2
         );
         ctx.fill();
-
-        // Border
         ctx.strokeStyle = isPlayer ? "#3a9e6e" : "#9e3a3a";
         ctx.lineWidth = 2;
         ctx.stroke();
-
-        // Inner detail
         ctx.fillStyle = isPlayer ? "#3a8e5e" : "#8e3a3a";
         ctx.beginPath();
         ctx.arc(
@@ -342,45 +261,24 @@ export function BattleCanvas({
           Math.PI * 2
         );
         ctx.fill();
-
-        // Crown/King indicator
-        if (isKing) {
-          ctx.fillStyle = tower.awake ? "#ffd700" : "#666";
-          ctx.font = `bold ${Math.round(radius * 0.8)}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(
-            tower.awake ? "\u2654" : "Z",
-            tower.pos.x * cellW,
-            tower.pos.y * cellH
-          );
-        } else {
-          ctx.fillStyle = "#ffd700";
-          ctx.font = `bold ${Math.round(radius * 0.6)}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(
-            "\u265C",
-            tower.pos.x * cellW,
-            tower.pos.y * cellH
-          );
-        }
-
-        // HP bar
+        ctx.fillStyle = isKing ? (tower.awake ? "#ffd700" : "#666") : "#ffd700";
+        ctx.font = `bold ${Math.round(radius * (isKing ? 0.8 : 0.6))}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          isKing ? (tower.awake ? "\u2654" : "Z") : "\u265C",
+          tower.pos.x * cellW,
+          tower.pos.y * cellH
+        );
         const hpRatio = tower.hp / tower.maxHp;
         const barW = radius * 2;
         const barH = 4;
         const barX = tower.pos.x * cellW - barW / 2;
         const barY = tower.pos.y * cellH - radius - 8;
-
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(barX, barY, barW, barH);
         ctx.fillStyle =
-          hpRatio > 0.5
-            ? "#4ade80"
-            : hpRatio > 0.25
-              ? "#fbbf24"
-              : "#ef4444";
+          hpRatio > 0.5 ? "#4ade80" : hpRatio > 0.25 ? "#fbbf24" : "#ef4444";
         ctx.fillRect(barX, barY, barW * hpRatio, barH);
       }
     }
@@ -389,7 +287,7 @@ export function BattleCanvas({
       const now = Date.now();
       for (const unit of state.units) {
         if (!unit.alive) continue;
-
+        if (unit.pos.y >= VISIBLE_GRID_ROWS) continue;
         const x = unit.pos.x * cellW;
         const y = unit.pos.y * cellH;
         const isPlayer = unit.team === "player";
@@ -474,7 +372,6 @@ export function BattleCanvas({
           drawUnitCircle(ctx, unit, x, y, radius, isPlayer);
         }
 
-        // HP bar
         const hpRatio = unit.hp / unit.maxHp;
         if (hpRatio < 1) {
           const drawScale = (sprites && config)
@@ -484,15 +381,10 @@ export function BattleCanvas({
           const barH = 3;
           const barX = x - barW / 2;
           const barY = y - radius * drawScale - 6;
-
           ctx.fillStyle = "rgba(0,0,0,0.6)";
           ctx.fillRect(barX, barY, barW, barH);
           ctx.fillStyle =
-            hpRatio > 0.5
-              ? "#4ade80"
-              : hpRatio > 0.25
-                ? "#fbbf24"
-                : "#ef4444";
+            hpRatio > 0.5 ? "#4ade80" : hpRatio > 0.25 ? "#fbbf24" : "#ef4444";
           ctx.fillRect(barX, barY, barW * hpRatio, barH);
         }
       }
@@ -523,29 +415,20 @@ export function BattleCanvas({
       ctx.fill();
     }
 
-    function drawProjectiles(
-      ctx: CanvasRenderingContext2D,
-      state: BattleState
-    ) {
+    function drawProjectiles(ctx: CanvasRenderingContext2D, state: BattleState) {
       for (const proj of state.projectiles) {
         if (!proj.alive) continue;
-
+        if (proj.current.y >= VISIBLE_GRID_ROWS) continue;
         const x = proj.current.x * cellW;
         const y = proj.current.y * cellH;
-
-        // Glow
         ctx.fillStyle = "rgba(255,200,50,0.3)";
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);
         ctx.fill();
-
-        // Core
         ctx.fillStyle = "#ffcc33";
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fill();
-
-        // Trail
         const tx = proj.from.x * cellW;
         const ty = proj.from.y * cellH;
         const gradient = ctx.createLinearGradient(tx, ty, x, y);
@@ -554,31 +437,65 @@ export function BattleCanvas({
         ctx.strokeStyle = gradient;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(
-          x - (x - tx) * 0.3,
-          y - (y - ty) * 0.3
-        );
+        ctx.moveTo(x - (x - tx) * 0.3, y - (y - ty) * 0.3);
         ctx.lineTo(x, y);
         ctx.stroke();
       }
     }
 
-    animFrameRef.current = requestAnimationFrame(render);
+    function render() {
+      const state = stateRef.current;
+      if (!state) {
+        animId = requestAnimationFrame(render);
+        return;
+      }
 
-    return () => {
-      cancelAnimationFrame(animFrameRef.current);
-    };
-  }, [stateRef, canvasWidth, canvasHeight, cellW, cellH]);
+      const now = performance.now();
+      const dt = Math.min((now - lastTickRef.current) / 1000, 0.05);
+      lastTickRef.current = now;
+
+      updateBattle(state, dt);
+
+      if (state.gameOver || Date.now() > resetAt) {
+        stateRef.current = init();
+        lastTickRef.current = performance.now();
+        resetAt = Date.now() + RESET_AFTER_MS;
+        animId = requestAnimationFrame(render);
+        return;
+      }
+
+      ctx.clearRect(0, 0, W, H);
+      drawArena(ctx);
+      drawTowers(ctx, state);
+      drawUnits(ctx, state);
+      drawProjectiles(ctx, state);
+
+      ctx.font = "bold 10px sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(239,68,68,0.9)";
+      ctx.fillText(OPPONENT_NAME, 4, 10);
+      ctx.fillStyle = "rgba(74,222,128,0.9)";
+      ctx.fillText(playerName, 4, H - 10);
+
+      animId = requestAnimationFrame(render);
+    }
+
+    animId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animId);
+  }, [card.id, card.color, playerName]);
 
   return (
     <canvas
       ref={canvasRef}
-      width={canvasWidth}
-      height={canvasHeight}
-      className="block w-full h-full"
-      onClick={handleClick}
-      onTouchStart={handleClick}
-      style={{ touchAction: "none" }}
+      width={W}
+      height={H}
+      className="rounded-lg border border-border bg-charcoal block mx-auto"
+      style={{
+        width: W * PREVIEW_DISPLAY_SCALE,
+        height: H * PREVIEW_DISPLAY_SCALE,
+        maxWidth: "100%",
+      }}
     />
   );
 }

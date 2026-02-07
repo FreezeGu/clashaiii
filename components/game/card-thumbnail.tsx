@@ -1,9 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { CardDef } from "@/lib/game/cards";
 import { cn } from "@/lib/utils";
 import { Sword, Zap, Shield, Target, Flame, Ghost } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+const LANCEGUARD_IDLE_FRAMES = 7;
+const LANCEGUARD_IDLE_FPS = 8;
 
 const ICON_MAP: Record<string, LucideIcon> = {
   sword: Sword,
@@ -35,7 +39,19 @@ export function CardThumbnail({
   onClick,
   className,
 }: CardThumbnailProps) {
+  const [idleFrame, setIdleFrame] = useState(0);
   const Icon = ICON_MAP[card.icon] || Sword;
+  const isLanceguard = card.id === "lancia";
+
+  useEffect(() => {
+    if (!isLanceguard) return;
+    const interval = 1000 / LANCEGUARD_IDLE_FPS;
+    const id = setInterval(() => {
+      setIdleFrame((f) => (f + 1) % LANCEGUARD_IDLE_FRAMES);
+    }, interval);
+    return () => clearInterval(id);
+  }, [isLanceguard]);
+
   const sizeClasses = {
     sm: "w-16 h-20",
     md: "w-20 h-28",
@@ -47,8 +63,9 @@ export function CardThumbnail({
       onClick={onClick}
       type="button"
       className={cn(
-        "relative rounded-lg border-2 flex flex-col items-center justify-between p-1.5 transition-all duration-200",
+        "relative rounded-lg border-2 flex flex-col items-center justify-between p-1.5 transition-all duration-200 ease-out",
         "bg-charcoal-light hover:brightness-110",
+        "hover:scale-105 focus:scale-105",
         selected
           ? "border-primary shadow-[0_0_12px_hsl(43,74%,49%,0.3)]"
           : "border-border hover:border-muted-foreground",
@@ -56,28 +73,34 @@ export function CardThumbnail({
         className
       )}
     >
-      {/* Cost badge */}
-      <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-        <span className="text-[10px] font-bold text-primary-foreground">
+      {/* Level badge - left, yellow */}
+      <div className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+        <span className="text-[8px] font-bold text-primary-foreground leading-none">
+          {aiLevel}
+        </span>
+      </div>
+
+      {/* Elixir cost badge - right, purple */}
+      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center">
+        <span className="text-[8px] font-bold text-white leading-none">
           {card.cost}
         </span>
       </div>
 
-      {/* AI Level badge */}
-      {aiLevel > 1 && (
-        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-secondary flex items-center justify-center border border-border">
-          <span className="text-[9px] font-bold text-foreground">
-            {aiLevel}
-          </span>
-        </div>
-      )}
-
-      {/* Card icon */}
-      <div
-        className="flex-1 flex items-center justify-center rounded"
-        style={{ color: card.color }}
-      >
-        <Icon className={cn(size === "sm" ? "h-6 w-6" : "h-8 w-8")} />
+      {/* Card icon / Lanceguard idle animation */}
+      <div className="flex-1 flex items-center justify-center rounded min-h-0 overflow-hidden">
+        {isLanceguard ? (
+          <img
+            src={`/units/lanceguard/idle/${idleFrame + 1}.png`}
+            alt="Lanceguard"
+            className={cn("object-contain", size === "sm" ? "h-10 w-10" : "h-12 w-12")}
+          />
+        ) : (
+          <Icon
+            className={cn(size === "sm" ? "h-6 w-6" : "h-8 w-8")}
+            style={{ color: card.color }}
+          />
+        )}
       </div>
 
       {/* Card name */}
