@@ -23,7 +23,7 @@ export function BattleEnd({
   const trophyChange = isWin ? TROPHY_WIN : isTie ? TROPHY_TIE : TROPHY_LOSS;
   const goldReward = isWin ? 50 : isTie ? 15 : 5;
 
-  const title = isWin ? "Vittoria!" : isTie ? "Pareggio" : "Sconfitta";
+  const title = isWin ? "Victory!" : isTie ? "Draw" : "Defeat";
   const subtitle = isWin
     ? "Your towers stand tall"
     : isTie
@@ -103,7 +103,7 @@ export function BattleEnd({
               >
                 {trophyChange > 0 ? `+${trophyChange}` : trophyChange}
               </div>
-              <div className="text-[10px] text-muted-foreground">Trofei</div>
+              <div className="text-[10px] text-muted-foreground">Trophies</div>
             </div>
           </div>
           <div className="flex items-center gap-2 bg-secondary rounded-lg p-3">
@@ -112,7 +112,7 @@ export function BattleEnd({
               <div className="text-sm font-bold text-gold-light">
                 +{goldReward}
               </div>
-              <div className="text-[10px] text-muted-foreground">Oro</div>
+              <div className="text-[10px] text-muted-foreground">Gold</div>
             </div>
           </div>
         </div>

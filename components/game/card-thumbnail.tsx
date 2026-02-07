@@ -87,7 +87,7 @@ export function CardThumbnail({
           size === "sm" ? "text-[8px]" : "text-[10px]"
         )}
       >
-        {card.italianName}
+        {card.name}
       </span>
 
       {/* Stats row */}

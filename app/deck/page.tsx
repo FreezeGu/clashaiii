@@ -66,7 +66,7 @@ export default function DeckPage() {
       <main className="flex-1 px-4 pt-4 pb-24 overflow-y-auto">
         {/* Page title */}
         <div className="mb-4">
-          <h1 className="text-xl font-bold text-foreground">Mazzo</h1>
+          <h1 className="text-xl font-bold text-foreground">Deck</h1>
           <p className="text-xs text-muted-foreground">
             Your battle deck - 6 cards
           </p>
@@ -134,7 +134,7 @@ export default function DeckPage() {
                   {selectedCard.name}
                 </h3>
                 <p className="text-xs text-muted-foreground italic">
-                  {selectedCard.italianName}
+                  {selectedCard.name}
                 </p>
               </div>
               <button

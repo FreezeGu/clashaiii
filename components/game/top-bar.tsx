@@ -57,7 +57,7 @@ export function TopBar() {
             <Trophy className="h-4 w-4 text-primary" />
             <span className="text-sm font-bold text-primary">{trophies}</span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-              Trofei
+              Trophies
             </span>
           </div>
           <div className="flex items-center gap-1.5">

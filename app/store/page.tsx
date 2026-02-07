@@ -41,7 +41,7 @@ export default function StorePage() {
 
       <main className="flex-1 px-4 pt-4 pb-24 overflow-y-auto">
         <div className="mb-4">
-          <h1 className="text-xl font-bold text-foreground">Negozio</h1>
+          <h1 className="text-xl font-bold text-foreground">Store</h1>
           <p className="text-xs text-muted-foreground">
             Spend your gold wisely
           </p>
@@ -59,7 +59,7 @@ export default function StorePage() {
           <div className="mb-6">
             <h2 className="text-sm font-semibold text-primary mb-2 flex items-center gap-1.5">
               <Sparkles className="h-4 w-4" />
-              Offerta del Giorno
+              Daily Deal
             </h2>
             <div className="bg-charcoal-light border border-primary/30 rounded-xl p-4 flex items-center gap-4">
               <div
@@ -72,8 +72,8 @@ export default function StorePage() {
                 <div className="text-sm font-bold text-foreground">
                   {dailyCard.name}
                 </div>
-                <div className="text-[10px] text-muted-foreground italic">
-                  {dailyCard.italianName}
+                <div className="text-[10px] text-muted-foreground">
+                  {dailyCard.description}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {hasDailyCard ? "Already owned - Get 50 gold" : "Unlock this card"}
@@ -111,7 +111,6 @@ export default function StorePage() {
             icon={<Coins className="h-6 w-6 text-gold-light" />}
             iconBg="hsl(43 74% 49% / 0.15)"
             title="Gold Pouch"
-            italianTitle="Sacchetto d'Oro"
             description="+200 Gold"
             price="Free"
             onPurchase={() => {
@@ -125,7 +124,6 @@ export default function StorePage() {
             icon={<Package className="h-6 w-6 text-gold-light" />}
             iconBg="hsl(43 74% 49% / 0.15)"
             title="Gold Chest"
-            italianTitle="Forziere d'Oro"
             description="+500 Gold"
             price="Free"
             onPurchase={() => {
@@ -139,7 +137,6 @@ export default function StorePage() {
             icon={<BookOpen className="h-6 w-6 text-primary" />}
             iconBg="hsl(43 74% 49% / 0.1)"
             title="AI Manual"
-            italianTitle="Manuale IA"
             description="Get 100 gold to use for AI upgrades"
             price="Free"
             onPurchase={() => {
@@ -153,7 +150,6 @@ export default function StorePage() {
             icon={<Gift className="h-6 w-6 text-primary" />}
             iconBg="hsl(43 74% 49% / 0.1)"
             title="Card Crate"
-            italianTitle="Cassa di Carte"
             description="Unlock a random missing card"
             price={`${150}`}
             priceIcon
@@ -180,7 +176,6 @@ function ShopItemCard({
   icon,
   iconBg,
   title,
-  italianTitle,
   description,
   price,
   priceIcon,
@@ -190,7 +185,6 @@ function ShopItemCard({
   icon: React.ReactNode;
   iconBg: string;
   title: string;
-  italianTitle: string;
   description: string;
   price: string;
   priceIcon?: boolean;
@@ -207,9 +201,6 @@ function ShopItemCard({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-bold text-foreground">{title}</div>
-        <div className="text-[10px] text-muted-foreground italic">
-          {italianTitle}
-        </div>
         <div className="text-xs text-muted-foreground mt-0.5 truncate">
           {description}
         </div>

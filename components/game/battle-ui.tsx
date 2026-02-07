@@ -160,7 +160,7 @@ export function BattleUI({
 
                 {/* Name */}
                 <span className="text-[8px] font-semibold text-foreground text-center leading-tight">
-                  {card.cardDef.italianName}
+                  {card.cardDef.name}
                 </span>
               </button>
             );

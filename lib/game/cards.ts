@@ -3,7 +3,6 @@
 export interface CardDef {
   id: string;
   name: string;
-  italianName: string;
   cost: number;
   hp: number;
   damage: number;
@@ -24,7 +23,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "lancia",
     name: "Lanceguard",
-    italianName: "Lancia",
     cost: 3,
     hp: 600,
     damage: 75,
@@ -41,7 +39,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "gladio",
     name: "Bladedancer",
-    italianName: "Gladio",
     cost: 4,
     hp: 800,
     damage: 110,
@@ -58,7 +55,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "sciame",
     name: "Swarm Rats",
-    italianName: "Sciame",
     cost: 2,
     hp: 150,
     damage: 40,
@@ -75,7 +71,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "vespe",
     name: "Wasp Pack",
-    italianName: "Vespe",
     cost: 3,
     hp: 200,
     damage: 55,
@@ -92,7 +87,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "arciere",
     name: "Bowmaster",
-    italianName: "Arciere",
     cost: 3,
     hp: 350,
     damage: 65,
@@ -110,7 +104,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "maga",
     name: "Frost Mage",
-    italianName: "Maga",
     cost: 4,
     hp: 400,
     damage: 85,
@@ -128,7 +121,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "colosso",
     name: "Stone Golem",
-    italianName: "Colosso",
     cost: 6,
     hp: 2200,
     damage: 140,
@@ -145,7 +137,6 @@ export const ALL_CARDS: CardDef[] = [
   {
     id: "bombarda",
     name: "Cannon Crew",
-    italianName: "Bombarda",
     cost: 5,
     hp: 500,
     damage: 120,
@@ -168,7 +159,6 @@ export const EXTRA_CARDS: CardDef[] = [
   {
     id: "fantasma",
     name: "Shadow Scout",
-    italianName: "Fantasma",
     cost: 2,
     hp: 250,
     damage: 90,
@@ -185,7 +175,6 @@ export const EXTRA_CARDS: CardDef[] = [
   {
     id: "catapulta",
     name: "Siege Hurler",
-    italianName: "Catapulta",
     cost: 5,
     hp: 600,
     damage: 150,

@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Torre di Battaglia - Tower Battle Card Game",
+  title: "Tower Battle - Card Game",
   description:
     "A premium tower-battle card game with strategic deck building and real-time arena combat.",
 };

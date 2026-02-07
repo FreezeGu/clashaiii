@@ -6,14 +6,9 @@ import { Home, Layers, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Home", italianLabel: "Casa", icon: Home },
-  { href: "/deck", label: "Deck", italianLabel: "Mazzo", icon: Layers },
-  {
-    href: "/store",
-    label: "Store",
-    italianLabel: "Negozio",
-    icon: ShoppingBag,
-  },
+  { href: "/", label: "Home", icon: Home },
+  { href: "/deck", label: "Deck", icon: Layers },
+  { href: "/store", label: "Store", icon: ShoppingBag },
 ];
 
 export function BottomNav() {
@@ -38,7 +33,7 @@ export function BottomNav() {
             >
               <Icon className="h-5 w-5" />
               <span className="text-[10px] font-medium tracking-wide uppercase">
-                {item.italianLabel}
+                {item.label}
               </span>
             </Link>
           );

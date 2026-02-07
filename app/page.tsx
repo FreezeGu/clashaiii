@@ -29,7 +29,7 @@ export default function HomePage() {
         {/* Title */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-foreground text-balance">
-            Torre di Battaglia
+            Tower Battle
           </h1>
           <p className="text-sm text-muted-foreground mt-1 tracking-wide">
             Tower Battle Card Game
@@ -45,7 +45,7 @@ export default function HomePage() {
                 {trophies}
               </div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Trofei
+                Trophies
               </div>
             </div>
           </div>
@@ -54,7 +54,7 @@ export default function HomePage() {
             <div>
               <div className="text-lg font-bold text-foreground">{gold}</div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Oro
+                Gold
               </div>
             </div>
           </div>
@@ -65,7 +65,7 @@ export default function HomePage() {
                 Arena: {tierName}
               </div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Livello Arena
+                Arena Level
               </div>
             </div>
           </div>
@@ -77,7 +77,7 @@ export default function HomePage() {
           className="group relative flex items-center justify-center gap-3 w-full max-w-xs min-h-[56px] rounded-xl bg-primary text-primary-foreground font-bold text-lg tracking-wide uppercase shadow-lg hover:brightness-110 transition-all active:scale-[0.98]"
         >
           <Swords className="h-6 w-6 transition-transform group-hover:rotate-12" />
-          <span>Battaglia</span>
+          <span>Battle</span>
           <div className="absolute inset-0 rounded-xl border border-gold-light/20" />
         </Link>
 
