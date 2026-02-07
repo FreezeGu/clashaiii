@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useCallback, useState } from "react";
+
 import type { BattleState } from "@/lib/game/battle-engine";
 import {
   GRID_W,
@@ -13,10 +13,7 @@ import {
   BRIDGE_RIGHT_COL_END,
 } from "@/lib/game/battle-engine";
 import {
-  canPlaceTroopDeploy,
-  isInDeployTerritory,
-  isInPocket,
-} from "@/lib/game/arena";
+
 
 interface BattleCanvasProps {
   stateRef: React.MutableRefObject<BattleState | null>;
@@ -39,7 +36,7 @@ export function BattleCanvas({
 }: BattleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
+
 
   const cellW = canvasWidth / GRID_W;
   const cellH = canvasHeight / GRID_H;
@@ -96,6 +93,61 @@ export function BattleCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    // Preload unit sprites (walk, attack, idle when configured)
+    for (const [cardId, config] of Object.entries(UNIT_SPRITE_CONFIG)) {
+      const walkImgs: HTMLImageElement[] = [];
+      const attackImgs: HTMLImageElement[] = [];
+      const idleImgs: HTMLImageElement[] = [];
+      const idleFrames = config.idleFrames ?? 0;
+      let walkLoaded = 0;
+      let attackLoaded = 0;
+      let idleLoaded = 0;
+
+      const maybeSet = () => {
+        if (
+          walkLoaded === config.walkFrames &&
+          attackLoaded === config.attackFrames &&
+          (idleFrames === 0 || idleLoaded === idleFrames)
+        ) {
+          spritesRef.current[cardId] = {
+            walk: walkImgs,
+            attack: attackImgs,
+            ...(idleFrames > 0 ? { idle: idleImgs } : {}),
+          };
+        }
+      };
+
+      for (let i = 1; i <= config.walkFrames; i++) {
+        const img = new Image();
+        img.src = getWalkFramePath(cardId, i);
+        walkImgs[i - 1] = img;
+        img.onload = () => {
+          walkLoaded++;
+          maybeSet();
+        };
+      }
+      for (let i = 1; i <= config.attackFrames; i++) {
+        const img = new Image();
+        img.src = getAttackFramePath(cardId, i);
+        attackImgs[i - 1] = img;
+        img.onload = () => {
+          attackLoaded++;
+          maybeSet();
+        };
+      }
+      if (idleFrames > 0) {
+        for (let i = 1; i <= idleFrames; i++) {
+          const img = new Image();
+          img.src = getIdleFramePath(cardId, i);
+          idleImgs[i - 1] = img;
+          img.onload = () => {
+            idleLoaded++;
+            maybeSet();
+          };
+        }
+      }
+    }
 
     function render() {
       if (!ctx) return;
@@ -445,6 +497,7 @@ export function BattleCanvas({
     }
 
     function drawUnits(ctx: CanvasRenderingContext2D, state: BattleState) {
+      const now = Date.now();
       for (const unit of state.units) {
         if (!unit.alive) continue;
 
@@ -452,37 +505,96 @@ export function BattleCanvas({
         const y = unit.pos.y * cellH;
         const isPlayer = unit.team === "player";
         const radius = unit.cardDef.count > 1 ? cellW * 0.3 : cellW * 0.45;
+        const cardId = unit.cardDef.id;
+        const sprites = spritesRef.current[cardId];
+        const config = UNIT_SPRITE_CONFIG[cardId];
 
-        // Shadow
-        ctx.fillStyle = "rgba(0,0,0,0.2)";
-        ctx.beginPath();
-        ctx.ellipse(x, y + radius * 0.3, radius * 0.9, radius * 0.3, 0, 0, Math.PI * 2);
-        ctx.fill();
+        if (sprites && config) {
+          const attackDurationMs = config.attackDurationMs ?? 400;
+          const inAttack = now - unit.lastAttackTime < attackDurationMs;
+          const isMoving =
+            unit.path.length > 0 && unit.pathIndex < unit.path.length;
+          const bodyScale = config.scale ?? 1;
+          const attackScale = config.attackScale ?? bodyScale;
+          const idleFrames = config.idleFrames ?? 0;
+          const hasIdle = idleFrames > 0 && sprites.idle?.length === idleFrames;
 
-        // Unit body
-        ctx.fillStyle = unit.cardDef.color;
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Team ring
-        ctx.strokeStyle = isPlayer ? "#4ade80" : "#ef4444";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Inner highlight
-        ctx.fillStyle = "rgba(255,255,255,0.15)";
-        ctx.beginPath();
-        ctx.arc(x - radius * 0.2, y - radius * 0.2, radius * 0.4, 0, Math.PI * 2);
-        ctx.fill();
+          if (inAttack && sprites.attack.length) {
+            const frameTime = attackDurationMs / config.attackFrames;
+            const attackFrameIndex = Math.max(
+              0,
+              Math.min(
+                config.attackFrames - 1,
+                Math.floor((now - unit.lastAttackTime) / frameTime)
+              )
+            );
+            const bodyImg = hasIdle ? sprites.idle![0] : sprites.walk[0];
+            const attackImg = sprites.attack[attackFrameIndex];
+            const bodyOk = bodyImg?.complete && bodyImg.naturalWidth;
+            const attackOk = attackImg?.complete && attackImg.naturalWidth;
+            if (bodyOk) {
+              const bw = radius * 2 * bodyScale;
+              const bh = radius * 2 * bodyScale;
+              ctx.save();
+              ctx.translate(x, y);
+              if (!isPlayer) ctx.scale(-1, 1);
+              ctx.drawImage(bodyImg, -bw / 2, -bh / 2, bw, bh);
+              if (attackOk) {
+                const aw = radius * 2 * attackScale;
+                const ah = radius * 2 * attackScale;
+                ctx.drawImage(attackImg, -aw / 2, -ah / 2, aw, ah);
+              }
+              ctx.restore();
+            } else if (attackOk) {
+              const aw = radius * 2 * attackScale;
+              const ah = radius * 2 * attackScale;
+              ctx.save();
+              ctx.translate(x, y);
+              if (!isPlayer) ctx.scale(-1, 1);
+              ctx.drawImage(attackImg, -aw / 2, -ah / 2, aw, ah);
+              ctx.restore();
+            } else {
+              drawUnitCircle(ctx, unit, x, y, radius, isPlayer);
+            }
+          } else {
+            let img: HTMLImageElement;
+            if (hasIdle && !isMoving) {
+              const idleFps = config.idleFps ?? 8;
+              const frameIndex =
+                Math.floor((now / 1000) * idleFps) % idleFrames;
+              img = sprites.idle![frameIndex];
+            } else {
+              const walkFps = config.walkFps ?? 10;
+              const frameIndex =
+                Math.floor((now / 1000) * walkFps) % config.walkFrames;
+              img = sprites.walk[frameIndex];
+            }
+            if (img?.complete && img.naturalWidth) {
+              const w = radius * 2 * bodyScale;
+              const h = radius * 2 * bodyScale;
+              ctx.save();
+              ctx.translate(x, y);
+              if (!isPlayer) ctx.scale(-1, 1);
+              ctx.drawImage(img, -w / 2, -h / 2, w, h);
+              ctx.restore();
+            } else {
+              drawUnitCircle(ctx, unit, x, y, radius, isPlayer);
+            }
+          }
+        } else {
+          drawUnitCircle(ctx, unit, x, y, radius, isPlayer);
+        }
 
         // HP bar
         const hpRatio = unit.hp / unit.maxHp;
         if (hpRatio < 1) {
-          const barW = radius * 2;
+          const drawScale = (sprites && config)
+            ? Math.max(config.scale ?? 1, config.attackScale ?? config.scale ?? 0)
+            : 1;
+          const barW = radius * 2 * drawScale;
           const barH = 3;
           const barX = x - barW / 2;
-          const barY = y - radius - 6;
+          const barY = y - radius * drawScale - 6;
 
           ctx.fillStyle = "rgba(0,0,0,0.6)";
           ctx.fillRect(barX, barY, barW, barH);
@@ -494,7 +606,50 @@ export function BattleCanvas({
                 : "#ef4444";
           ctx.fillRect(barX, barY, barW * hpRatio, barH);
         }
+
+        if (unit.frozenUntil > now) {
+          const r = radius * 1.4;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.fillStyle = "rgba(100, 200, 255, 0.25)";
+          ctx.strokeStyle = "rgba(80, 180, 255, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, -r);
+          ctx.lineTo(r * 0.7, r * 0.5);
+          ctx.lineTo(0, r * 0.3);
+          ctx.lineTo(-r * 0.7, r * 0.5);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
       }
+    }
+
+    function drawUnitCircle(
+      ctx: CanvasRenderingContext2D,
+      unit: BattleState["units"][0],
+      x: number,
+      y: number,
+      radius: number,
+      isPlayer: boolean
+    ) {
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.beginPath();
+      ctx.ellipse(x, y + radius * 0.3, radius * 0.9, radius * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = unit.cardDef.color;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isPlayer ? "#4ade80" : "#ef4444";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.beginPath();
+      ctx.arc(x - radius * 0.2, y - radius * 0.2, radius * 0.4, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     function drawProjectiles(

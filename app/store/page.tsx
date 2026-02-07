@@ -5,7 +5,7 @@ import { TopBar } from "@/components/game/top-bar";
 import { BottomNav } from "@/components/game/bottom-nav";
 import { useGameStore } from "@/lib/game/store";
 import { COLLECTION_CARDS } from "@/lib/game/cards";
-import { Coins, Package, BookOpen, Gift, Sparkles } from "lucide-react";
+import { Coins, Gift, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function StorePage({
@@ -22,13 +22,24 @@ export default function StorePage({
     gold,
     ownedCardIds,
     dailyDealCardId,
-    purchaseGoldPack,
     purchaseCardCrate,
     refreshDailyDeal,
     unlockCard,
     addGold,
+    claimDailyGold,
+    lastDailyGoldClaimAt,
   } = useGameStore();
   const [message, setMessage] = useState<string | null>(null);
+
+  const now = Date.now();
+  const canClaimDaily =
+    lastDailyGoldClaimAt === 0 || now - lastDailyGoldClaimAt >= 24 * 60 * 60 * 1000;
+  const nextClaimInMs =
+    lastDailyGoldClaimAt > 0
+      ? Math.max(0, lastDailyGoldClaimAt + 24 * 60 * 60 * 1000 - now)
+      : 0;
+  const nextClaimHours = Math.floor(nextClaimInMs / (60 * 60 * 1000));
+  const nextClaimMins = Math.floor((nextClaimInMs % (60 * 60 * 1000)) / (60 * 1000));
 
   useEffect(() => {
     refreshDailyDeal();
@@ -60,6 +71,47 @@ export default function StorePage({
             {message}
           </div>
         )}
+
+        {/* Daily reward: 100 gold every 24h */}
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-primary mb-2 flex items-center gap-1.5">
+            <Coins className="h-4 w-4" />
+            Daily reward
+          </h2>
+          <div className="bg-charcoal-light border border-primary/30 rounded-xl p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-primary/20">
+              <Coins className="h-6 w-6 text-gold-light" />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-bold text-foreground">
+                100 Gold
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {canClaimDaily
+                  ? "Claim once every 24 hours"
+                  : `Next claim in ${nextClaimHours}h ${nextClaimMins}m`}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                if (claimDailyGold()) {
+                  showMessage("+100 Gold!");
+                }
+              }}
+              disabled={!canClaimDaily}
+              className={cn(
+                "min-h-[44px] px-4 rounded-lg font-semibold text-sm flex items-center gap-1.5 transition-colors shrink-0",
+                canClaimDaily
+                  ? "bg-primary text-primary-foreground hover:brightness-110"
+                  : "bg-muted text-muted-foreground cursor-not-allowed"
+              )}
+              type="button"
+            >
+              <Coins className="h-3.5 w-3.5" />
+              {canClaimDaily ? "Claim" : "Claimed"}
+            </button>
+          </div>
+        </div>
 
         {/* Daily Deal */}
         {dailyCard && (
@@ -113,45 +165,6 @@ export default function StorePage({
 
         {/* Shop items */}
         <div className="flex flex-col gap-3">
-          {/* Gold Pack Small */}
-          <ShopItemCard
-            icon={<Coins className="h-6 w-6 text-gold-light" />}
-            iconBg="hsl(43 74% 49% / 0.15)"
-            title="Gold Pouch"
-            description="+200 Gold"
-            price="Free"
-            onPurchase={() => {
-              purchaseGoldPack(200);
-              showMessage("+200 Gold!");
-            }}
-          />
-
-          {/* Gold Pack Large */}
-          <ShopItemCard
-            icon={<Package className="h-6 w-6 text-gold-light" />}
-            iconBg="hsl(43 74% 49% / 0.15)"
-            title="Gold Chest"
-            description="+500 Gold"
-            price="Free"
-            onPurchase={() => {
-              purchaseGoldPack(500);
-              showMessage("+500 Gold!");
-            }}
-          />
-
-          {/* AI Manual */}
-          <ShopItemCard
-            icon={<BookOpen className="h-6 w-6 text-primary" />}
-            iconBg="hsl(43 74% 49% / 0.1)"
-            title="AI Manual"
-            description="Get 100 gold to use for AI upgrades"
-            price="Free"
-            onPurchase={() => {
-              addGold(100);
-              showMessage("+100 Gold for AI upgrades!");
-            }}
-          />
-
           {/* Card Crate */}
           <ShopItemCard
             icon={<Gift className="h-6 w-6 text-primary" />}
